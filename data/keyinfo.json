@@ -1,0 +1,6 @@
+{
+  "kdf": "PBKDF2-HMAC-SHA256",
+  "iterations": 310000,
+  "salt": "VE7p1GynMsCY7GsKQ+DhBA==",
+  "cipher": "AES-256-GCM"
+}

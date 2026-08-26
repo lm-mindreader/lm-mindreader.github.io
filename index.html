@@ -1,0 +1,750 @@
+<title>Belief Trajectories</title>
+<style>
+:root{
+  --paper:#F4F6F7;--surface:#FFFFFF;--sunk:#EAEEF0;--ink:#16202B;--ink-2:#48586A;--ink-3:#7C8B9B;
+  --rule:#D6DEE3;--rule-2:#E7ECEF;--accent:#0F6F78;--accent-soft:#DCEDEE;
+  --ok-bg:#E2EFE6;--ok-ink:#2F6B44;--bad-bg:#FBEAE4;--bad-ink:#9C3E1E;--neu-bg:#EDEEF0;--neu-ink:#5C6976;
+  --warn-bg:#FBF3E2;--warn-ink:#7A5A1E;--warn-rule:#E6D3A8;
+  --c-task:#6B7A89;--c-sol:#0F6F78;--c-beh:#B4762F;--c-self:#3E7D5A;--c-inf:#8E4A82;
+  --serif:ui-serif,Georgia,'Iowan Old Style','Times New Roman',serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0D1318;--surface:#151D24;--sunk:#111920;--ink:#DCE5EB;--ink-2:#93A5B4;--ink-3:#6B7C8B;
+  --rule:#243039;--rule-2:#1C262E;--accent:#4FBAC3;--accent-soft:#123034;
+  --ok-bg:#17301F;--ok-ink:#8DC79F;--bad-bg:#331F19;--bad-ink:#E09B7B;--neu-bg:#1D262D;--neu-ink:#8B99A6;
+  --warn-bg:#2B2415;--warn-ink:#D9BC7C;--warn-rule:#4A3D20;
+  --c-task:#93A3B2;--c-sol:#4FBAC3;--c-beh:#DFA45C;--c-self:#6FB98C;--c-inf:#C888BA;
+}}
+:root[data-theme="dark"]{
+  --paper:#0D1318;--surface:#151D24;--sunk:#111920;--ink:#DCE5EB;--ink-2:#93A5B4;--ink-3:#6B7C8B;
+  --rule:#243039;--rule-2:#1C262E;--accent:#4FBAC3;--accent-soft:#123034;
+  --ok-bg:#17301F;--ok-ink:#8DC79F;--bad-bg:#331F19;--bad-ink:#E09B7B;--neu-bg:#1D262D;--neu-ink:#8B99A6;
+  --warn-bg:#2B2415;--warn-ink:#D9BC7C;--warn-rule:#4A3D20;
+  --c-task:#93A3B2;--c-sol:#4FBAC3;--c-beh:#DFA45C;--c-self:#6FB98C;--c-inf:#C888BA;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px 64px}
+h3{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:0 0 .7rem;font-weight:500}
+header{padding:26px 0 20px;border-bottom:1px solid var(--rule)}
+.handle{font-family:var(--mono);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 14px}
+
+.pickbar{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+.runs{display:flex;gap:0}
+.rb{font:inherit;font-family:var(--mono);font-size:.72rem;background:var(--surface);border:1px solid var(--rule);
+  color:var(--ink-2);padding:.4rem .8rem;cursor:pointer;display:flex;flex-direction:column;gap:1px;text-align:left}
+.rb+.rb{margin-left:-1px}
+.rb:hover{color:var(--accent)}
+.rb[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);position:relative;z-index:1}
+.rb .rn{font-weight:600}
+.rb .rm{font-size:.64rem;color:var(--ink-3)}
+.rb[aria-selected="true"] .rm{color:var(--accent)}
+.find{flex:1 1 240px;min-width:0;font:inherit;font-family:var(--mono);font-size:.75rem;
+  background:var(--surface);border:1px solid var(--rule);color:var(--ink);padding:.4rem .7rem}
+.find::placeholder{color:var(--ink-3)}
+.find:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.pcount{font-family:var(--mono);font-size:.7rem;color:var(--ink-3);align-self:center;white-space:nowrap}
+
+.cases{margin:10px 0 0;max-height:184px;overflow:auto;border:1px solid var(--rule-2);background:var(--surface)}
+.cr{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:12px;align-items:center;
+  width:100%;padding:.4rem .7rem;background:none;border:0;border-bottom:1px solid var(--rule-2);
+  font:inherit;color:inherit;text-align:left;cursor:pointer}
+.cr:last-child{border-bottom:0}
+.cr:hover{background:var(--sunk)}
+.cr[aria-selected="true"]{background:var(--accent-soft)}
+.cr .ci{font-family:var(--mono);font-size:.72rem;color:var(--ink-2);white-space:nowrap}
+.cr[aria-selected="true"] .ci{color:var(--accent);font-weight:600}
+.cr .cq{font-size:.78rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr .cn{font-family:var(--mono);font-size:.7rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.cr .cd{width:7px;height:7px;border-radius:50%;display:block}
+.cr .thin{color:var(--warn-ink);background:var(--warn-bg);padding:0 .25rem;border-radius:2px}
+.empty{padding:.8rem;font-family:var(--mono);font-size:.72rem;color:var(--ink-3)}
+
+.warn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-rule);padding:9px 13px;
+  font-family:var(--mono);font-size:.72rem;line-height:1.55;margin:10px 0 0}
+.layout{display:grid;gap:18px;margin-top:22px;grid-template-columns:1fr}
+@media(min-width:1000px){.layout{grid-template-columns:minmax(0,1fr) 310px}}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--rule-2);padding:17px 19px}
+.qbox{font-size:.9rem;white-space:pre-wrap;font-family:var(--mono);line-height:1.65;max-height:210px;overflow:auto}
+.qlist{display:flex;flex-direction:column;gap:1px;max-height:460px;overflow:auto}
+.qr{display:grid;grid-template-columns:9px 1fr auto;gap:7px;align-items:center;padding:3px 5px;cursor:pointer;background:none;border:0;font:inherit;color:inherit;text-align:left;width:100%}
+.qr:hover{background:var(--sunk)}
+.qr[aria-selected="true"]{background:var(--accent-soft)}
+.qr .sw{width:9px;height:9px;border-radius:1px}
+.qr .nm{font-family:var(--mono);font-size:.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qr .vv{font-family:var(--mono);font-size:.7rem;font-variant-numeric:tabular-nums;color:var(--ink-2);text-align:right}
+.qr .bb{height:3px;background:var(--sunk);position:relative;margin-top:2px}
+.hint{font-size:.75rem;color:var(--ink-3);margin:0 0 11px;line-height:1.5}
+.hint b{font-weight:600;color:var(--ink-2)}
+.cot{font-family:var(--mono);font-size:.78rem;line-height:1.85;max-height:300px;overflow:auto;background:var(--sunk);padding:13px 15px;white-space:pre-wrap;word-break:break-word}
+.cot .hl{background:var(--accent);color:var(--paper);font-weight:600;padding:.05em .2em;border-radius:2px}
+.cot .hl:empty::after{content:'\200b'}
+.dim{color:var(--ink-3)}
+.scrub{font-family:var(--mono);font-size:.73rem;color:var(--ink-3);margin-top:9px;display:flex;gap:1rem;flex-wrap:wrap}
+.legend{display:flex;gap:.9rem;flex-wrap:wrap;font-family:var(--mono);font-size:.68rem;color:var(--ink-2);margin-top:10px}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:.3rem}
+.qtext{font-family:var(--mono);font-size:.78rem;line-height:1.7;background:var(--sunk);padding:11px 13px;
+  white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}
+.qhead{display:flex;align-items:center;gap:7px;margin-bottom:8px;font-family:var(--mono);font-size:.72rem}
+.qhead .sw{width:9px;height:9px;border-radius:1px;flex:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cv{position:relative;width:100%;overflow:hidden}
+canvas{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none}
+.zbar{display:flex;gap:8px;align-items:center;margin-top:8px;font-family:var(--mono);font-size:.7rem;color:var(--ink-3);flex-wrap:wrap}
+.zbtn{font:inherit;background:var(--sunk);border:1px solid var(--rule-2);color:var(--ink-2);padding:.2rem .5rem;cursor:pointer}
+.zbtn:hover{border-color:var(--accent);color:var(--accent)}
+.controls{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 10px}
+.gran{display:flex;gap:0}
+.gb{font:inherit;font-family:var(--mono);font-size:.68rem;background:var(--surface);
+  border:1px solid var(--rule);color:var(--ink-2);padding:.2rem .6rem;cursor:pointer}
+.gb+.gb{margin-left:-1px}
+.gb[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);position:relative;z-index:1}
+.ctab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.7rem;
+  font-variant-numeric:tabular-nums}
+.ctab th{text-align:right;font-weight:500;color:var(--ink-3);padding:2px 5px;
+  border-bottom:1px solid var(--rule-2);white-space:nowrap}
+.ctab th:first-child,.ctab td:first-child{text-align:left}
+.ctab td{padding:2px 5px;border-bottom:1px solid var(--rule-2);text-align:right;white-space:nowrap}
+.ctab tr.real td{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.ctab .tk{max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.dbar{display:inline-block;height:3px;background:var(--accent);vertical-align:middle}
+.abar{display:inline-block;height:3px;background:var(--ink-3);vertical-align:middle}
+.tokchip{font-family:var(--mono);background:var(--accent-soft);color:var(--accent);padding:.05em .3em;border-radius:2px}
+</style>
+<style>
+.gate{position:fixed;inset:0;background:var(--paper);display:flex;align-items:center;
+  justify-content:center;padding:24px;z-index:50}
+.gate[hidden]{display:none}
+.gatebox{max-width:400px;width:100%}
+.gatebox h1{font-family:var(--mono);font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 14px;font-weight:500}
+.gatebox p{color:var(--ink-2);font-size:.85rem;margin:0 0 16px;line-height:1.5}
+.gaterow{display:flex;gap:0}
+.gatebox input{flex:1;min-width:0;font:inherit;font-family:var(--mono);font-size:.85rem;
+  background:var(--surface);border:1px solid var(--rule);color:var(--ink);padding:.5rem .7rem}
+.gatebox input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.gatebox button{font:inherit;font-family:var(--mono);font-size:.8rem;background:var(--accent);
+  border:1px solid var(--accent);color:var(--paper);padding:.5rem 1.1rem;cursor:pointer;margin-left:-1px}
+.gatebox button:disabled{opacity:.55;cursor:default}
+.gatemsg{font-family:var(--mono);font-size:.73rem;margin-top:10px;min-height:1.2em}
+.gatemsg.bad{color:var(--bad-ink)}
+.gatemsg.busy{color:var(--ink-3)}
+.loading{font-family:var(--mono);font-size:.72rem;color:var(--ink-3);padding:.4rem 0}
+</style>
+
+<div class="gate" id="gate">
+  <div class="gatebox">
+    <h1>Belief results</h1>
+    <p>These results are encrypted. Enter the password to decrypt them in your browser &mdash;
+    nothing is sent anywhere.</p>
+    <form class="gaterow" id="gateform">
+      <input id="pw" type="password" autocomplete="current-password" placeholder="password"
+             aria-label="password" autofocus>
+      <button type="submit" id="go">Open</button>
+    </form>
+    <div class="gatemsg" id="gatemsg"></div>
+  </div>
+</div>
+<div class="wrap">
+<header>
+  <div class="handle" id="handle">Belief results</div>
+  <div class="pickbar">
+    <input class="find" id="find" type="search" autocomplete="off"
+           placeholder="filter by subject, index or question">
+    <span class="pcount" id="pcount"></span>
+  </div>
+  <div id="runwarn"></div>
+  <div class="cases" id="cases" role="listbox" aria-label="chains of thought"></div>
+  <div class="loading" id="loading"></div>
+</header>
+
+<div class="layout">
+  <div class="col">
+    <div class="panel">
+      <h3>The problem</h3>
+      <div class="qbox" id="question"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Belief &alpha;</h3>
+      <div class="cv"><canvas id="chart" height="300"></canvas></div>
+      <div class="legend" id="legend"></div>
+      <div class="scrub" id="scrub"></div>
+      <div class="zbar" id="zbar"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Pointwise information s</h3>
+      <div class="controls">
+        <div class="gran" id="gran" role="tablist"></div>
+        <div class="gran" id="yfit" role="tablist"></div>
+      </div>
+      <div class="cv"><canvas id="schart" height="150"></canvas></div>
+      <div class="scrub" id="sscale"></div>
+    </div>
+
+
+    <div class="panel">
+      <h3>The chain of thought</h3>
+      <div class="cot" id="cot"></div>
+      <div id="cotwarn"></div>
+    </div>
+    <div class="panel">
+      <h3>Belief &alpha; &times; pointwise information s</h3>
+      <div class="cv"><canvas id="scatter" height="240"></canvas></div>
+      <div class="scrub" id="scinfo"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h3>Queries</h3>
+      <div class="qlist" id="qlist"></div>
+    </div>
+    <div class="panel">
+      <h3>Query</h3>
+      <div id="qdetail"></div>
+    </div>
+    <div class="panel">
+      <h3>Candidates at this token</h3>
+      <div id="cand"></div>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const CLUSTER={task_verbatim:'task',concept_name:'task',solution_correct:'sol',
+ solution_incorrect:'sol',correctness_keyword:'sol',solution_keyword:'sol',solution_word:'sol',
+ answer_word:'sol',problem_setup:'beh',plan_generation:'beh',fact_retrieval:'beh',
+ active_computation:'beh',uncertainty_management:'beh',result_consolidation:'beh',
+ self_checking:'beh',final_answer_emission:'beh',close_to_solution:'self',
+ heading_toward_correct:'self',backtracking:'inf',realization:'inf',reconsideration:'inf'};
+const CNAME={task:'task/concept',sol:'solutions & keywords',beh:'reasoning behaviour',
+ self:'self-assessment',inf:'inflection points'};
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.body).getPropertyValue(n).trim();
+const colOf=q=>css('--c-'+(CLUSTER[q]||'task'));
+const num=n=>n.toLocaleString();
+
+
+// ---------------------------------------------------------------------------
+// Data layer. Nothing is embedded: each chain is an AES-256-GCM shard fetched
+// and decrypted on demand. The key never leaves the browser and is not stored;
+// a reload asks again. This is real encryption rather than a gate because the
+// shards sit at guessable URLs in a public repo - a JS check would protect
+// nothing. Its limits are honest ones: one shared password, no revocation.
+// ---------------------------------------------------------------------------
+const DATA='data/';
+let KEY=null, MAN=null;
+const SHARD={};
+
+async function deriveKey(password, info){
+  const enc=new TextEncoder();
+  const base=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2',salt:b64bytes(info.salt),iterations:info.iterations,hash:'SHA-256'},
+    base,{name:'AES-GCM',length:256},false,['decrypt']);
+}
+
+async function fetchSealed(name){
+  const r=await fetch(DATA+name,{cache:'force-cache'});
+  if(!r.ok)throw new Error(`${name}: ${r.status}`);
+  const buf=new Uint8Array(await r.arrayBuffer());
+  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(0,12)},KEY,buf.slice(12));
+  return new Uint8Array(plain);
+}
+
+const dec=new TextDecoder();
+async function fetchJson(name){ return JSON.parse(dec.decode(await fetchSealed(name))); }
+
+// header length, header JSON, then the arrays back to back in a fixed order
+function unpack(bytes){
+  const hlen=new DataView(bytes.buffer,bytes.byteOffset,4).getUint32(0,true);
+  const head=JSON.parse(dec.decode(bytes.subarray(4,4+hlen)));
+  let off=4+hlen;
+  const take=k=>{
+    const a=new Uint16Array(bytes.buffer.slice(bytes.byteOffset+off,bytes.byteOffset+off+k*2));
+    off+=k*2;return a;
+  };
+  const grow=(u,lo,hi)=>{
+    const out=new Float32Array(u.length),k=(hi-lo)/65535;
+    for(let i=0;i<u.length;i++)out[i]=lo+u[i]*k;
+    return out;
+  };
+  const n=head.n,A={},S={};
+  head.queries.forEach(q=>{A[q]=grow(take(n),0,1);});
+  head.queries.forEach(q=>{S[q]=grow(take(n),head.sLo,head.sHi);});
+  let cand=null;
+  if(head.cand){
+    const m=head.cand.m;
+    const v=take(m), a=grow(take(m),head.cand.lo,head.cand.hi), alpha={};
+    head.queries.forEach(q=>{alpha[q]=grow(take(m),0,1);});
+    const off2=[0];
+    for(let i=0;i<head.cand.k.length;i++)off2.push(off2[i]+head.cand.k[i]);
+    const at={};head.cand.t.forEach((tk,i)=>{at[tk]=i;});
+    cand={t:head.cand.t,k:head.cand.k,r:head.cand.r,vocab:head.cand.vocab,
+          v:v,a:a,alpha:alpha,off:off2,at:at};
+  }
+  return Object.assign({},head,{alpha:A,s:S,cand:cand});
+}
+
+async function loadCase(idx){
+  if(SHARD[idx])return SHARD[idx];
+  setLoading(`decrypting chain ${idx}\u2026`);
+  const c=unpack(await fetchSealed(`case-${idx}.enc`));
+  setLoading('');
+  return SHARD[idx]=c;
+}
+function setLoading(t){ $('loading').textContent=t; }
+
+let cur=null, sel=null, pos=0, lo=0, hi=0, filter='', gran='token', yfit='shared';
+const C=()=>SHARD[cur];
+const QS=()=>C().queries;
+const R=()=>MAN;
+// Buckets sum per_token.s, the teacher-forced estimator. That one is a real
+// autoregressive factorisation, so its per-token log-ratios telescope to
+// log P_guided - log P_free and adding them up means something. The Eq 12 candidate
+// breakdown renormalises delta at each position independently and does not telescope, so
+// nothing in the candidate panel is ever summed across tokens.
+const BUCK={};
+function bucketsOf(c,g){
+  if(g==='token')return null;
+  const key=cur+':'+g;
+  if(BUCK[key])return BUCK[key];
+  const starts=c.buckets[g]||[0],sums={},edges=[];
+  for(let b=0;b<starts.length;b++)edges.push([starts[b],b+1<starts.length?starts[b+1]:c.n]);
+  let mx=1e-6;
+  for(const q in c.s){
+    const a=c.s[q],out=new Float32Array(edges.length);
+    for(let b=0;b<edges.length;b++){
+      let acc=0;
+      for(let i=edges[b][0];i<edges[b][1];i++)acc+=a[i];
+      out[b]=acc;
+      const v=Math.abs(acc);if(v>mx)mx=v;
+    }
+    sums[q]=out;
+  }
+  return BUCK[key]={edges:edges,sums:sums,max:mx};
+}
+
+// The shared scale keeps every query and every zoom comparable; the per-query fit trades
+// that away when one query's s is an order of magnitude flatter than the panel's loudest.
+const QCAP={};
+function qCapOf(c,q){
+  const key=cur+':'+q;
+  if(QCAP[key]!==undefined)return QCAP[key];
+  const a=c.s[q],t=new Float64Array(a.length);
+  for(let i=0;i<a.length;i++)t[i]=Math.abs(a[i]);
+  t.sort();
+  return QCAP[key]=t[Math.min(t.length-1,Math.floor(t.length*0.999))]||1e-3;
+}
+function absMax(arr){
+  let m=1e-6;
+  for(let i=0;i<arr.length;i++){const v=Math.abs(arr[i]);if(v>m)m=v;}
+  return m;
+}
+
+function seg(box,items,get,set){
+  box.textContent='';
+  items.forEach(([val,label])=>{
+    const b=document.createElement('button');
+    b.className='gb';b.setAttribute('role','tab');b.setAttribute('aria-selected',get()===val);
+    b.textContent=label;
+    b.onclick=()=>{set(val);[...box.children].forEach(x=>x.setAttribute('aria-selected',false));
+      b.setAttribute('aria-selected',true);render();};
+    box.appendChild(b);
+  });
+}
+
+function GRAN_INIT(){
+  seg($('gran'),[['token','per token'],['sent','per sentence'],['para','per paragraph']],
+      ()=>gran,v=>{gran=v;});
+  seg($('yfit'),[['shared','shared scale'],['query','fit to query']],
+      ()=>yfit,v=>{yfit=v;});
+}
+
+
+function matches(c,f){
+  if(!f)return true;
+  return (c.subject+' '+c.idx+' '+c.id+' '+c.question).toLowerCase().includes(f);
+}
+
+function CASES_INIT(){
+  const box=$('cases');box.textContent='';
+  const f=filter.trim().toLowerCase(),all=MAN.cases;
+  let shown=0;
+  all.forEach(c=>{
+    if(!matches(c,f))return;
+    shown++;
+    const b=document.createElement('button');
+    b.className='cr';b.setAttribute('role','option');b.setAttribute('aria-selected',c.idx===cur);
+    const tone=c.correct===true?'--ok-ink':c.correct===false?'--bad-ink':'--neu-ink';
+    b.innerHTML=`<span class="ci">${esc(c.subject)} · ${c.idx}</span>`+
+      `<span class="cq">${esc(c.question)}</span>`+
+      `<span class="cn">${num(c.n)} tok${c.nq<MAN.queries.length?` · <span class="thin">${c.nq}/${MAN.queries.length}q</span>`:''}</span>`+
+      `<span class="cd" style="background:var(${tone})" title="${c.correct===true?'correct':c.correct===false?'wrong':'ungraded'}"></span>`;
+    b.onclick=()=>{open_(c.idx);};
+    box.appendChild(b);
+  });
+  if(!shown){
+    const e=document.createElement('div');e.className='empty';
+    e.textContent='no chain of thought matches that filter';box.appendChild(e);
+  }
+  $('pcount').textContent=shown===all.length?`${all.length} chains`:`${shown} of ${all.length}`;
+}
+
+async function open_(idx){
+  try{
+    await loadCase(idx);
+  }catch(e){ setLoading(`could not load chain ${idx}: ${e.message}`); return; }
+  cur=idx;sel=null;
+  [...$('cases').children].forEach(x=>x.setAttribute('aria-selected',false));
+  const btn=[...$('cases').children].find(x=>x.querySelector&&x.querySelector('.ci')&&
+    x.querySelector('.ci').textContent.endsWith('· '+idx));
+  if(btn)btn.setAttribute('aria-selected',true);
+  resetView();render();
+}
+
+function resetView(){const n=C().n;lo=0;hi=n-1;pos=Math.floor(hi/2);}
+
+function drawRunWarn(){
+  const missing=MAN.cases.filter(c=>c.nq<MAN.queries.length).length;
+  $('runwarn').innerHTML=missing
+    ?`<div class="warn">${missing} chain(s) here were scored against fewer than all `+
+     `${MAN.queries.length} queries.</div>`:'';
+}
+function fit(cv,h){
+  const r=cv.parentElement.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  cv.width=Math.max(320,Math.round(r.width*dpr));cv.height=Math.round(h*dpr);
+  cv.style.height=h+'px';
+  const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  return [g,r.width,h];
+}
+
+// draw one series as min/max envelope per pixel column: no averaging, spikes survive
+function series(g,arr,x0,w,y,wide){
+  const span=hi-lo+1,per=span/w;
+  g.beginPath();
+  for(let px=0;px<w;px++){
+    const a=lo+Math.floor(px*per),b=Math.min(hi,lo+Math.ceil((px+1)*per)-1);
+    let mn=Infinity,mx=-Infinity;
+    for(let i=a;i<=b;i++){const v=arr[i];if(v<mn)mn=v;if(v>mx)mx=v;}
+    if(mn===Infinity)continue;
+    const X=x0+px+.5;
+    if(mx-mn<1e-9){g.moveTo(X,y(mn));g.lineTo(X,y(mn)+.6);}
+    else{g.moveTo(X,y(mx));g.lineTo(X,y(mn));}
+  }
+  g.lineWidth=wide?1.6:1;g.stroke();
+}
+
+function drawChart(){
+  const c=C(),[g,W,H]=fit($('chart'),300);
+  const PL=42,PR=8,PT=10,PB=24,w=Math.max(1,Math.round(W-PL-PR));
+  g.clearRect(0,0,W,H);
+  const y=a=>PT+(1-a)*(H-PT-PB);
+  g.strokeStyle=css('--rule-2');g.lineWidth=1;
+  g.fillStyle=css('--ink-3');g.font='9px ui-monospace,monospace';g.textAlign='right';
+  for(let v=0;v<=1;v+=0.25){
+    g.beginPath();g.moveTo(PL,y(v));g.lineTo(W-PR,y(v));g.stroke();
+    g.fillText(v.toFixed(2),PL-5,y(v)+3);
+  }
+  QS().forEach(q=>{
+    if(sel&&q===sel)return;
+    g.strokeStyle=colOf(q);g.globalAlpha=sel?0.08:0.34;
+    series(g,c.alpha[q],PL,w,y,false);
+  });
+  g.globalAlpha=1;
+  if(sel){g.strokeStyle=colOf(sel);series(g,c.alpha[sel],PL,w,y,true);}
+  const cx=PL+(pos-lo)/(hi-lo)*w;
+  g.strokeStyle=css('--ink-2');g.setLineDash([3,3]);g.beginPath();
+  g.moveTo(cx,PT);g.lineTo(cx,H-PB);g.stroke();g.setLineDash([]);
+  g.textAlign='left';g.fillText('token '+num(lo),PL,H-8);
+  g.textAlign='right';g.fillText('token '+num(hi),W-PR,H-8);
+}
+
+// s is drawn on one scale per CoT, fixed for the whole chain, so zooming or isolating a
+// query changes what is on screen and never what a given height means - the old
+// rescale-to-the-visible-window made a quiet stretch look exactly like a loud one. The
+// scale is the CoT's 99.9th percentile of |s| rather than its max, because the tail runs
+// two orders of magnitude past the body; the handful of tokens above it are drawn pinned
+// to the edge and counted underneath, not dropped.
+function drawS(){
+  const c=C(),[g,W,H]=fit($('schart'),150);
+  const PL=42,PR=8,PT=10,PB=18,w=Math.max(1,Math.round(W-PL-PR));
+  g.clearRect(0,0,W,H);
+  const B=bucketsOf(c,gran);
+  const fitted=yfit==='query'&&sel;
+  const mx=B?(fitted?absMax(B.sums[sel]):B.max):(fitted?qCapOf(c,sel):c.sCap);
+  const y=v=>PT+(1-(Math.max(-mx,Math.min(mx,v))/mx+1)/2)*(H-PT-PB);
+  g.fillStyle=css('--ink-3');g.font='9px ui-monospace,monospace';g.textAlign='right';
+  [mx,mx/2,0,-mx/2,-mx].forEach(v=>{
+    g.strokeStyle=v===0?css('--rule'):css('--rule-2');
+    g.beginPath();g.moveTo(PL,y(v));g.lineTo(W-PR,y(v));g.stroke();
+    g.fillText((v>0?'+':'')+v.toFixed(1),PL-5,y(v)+3);
+  });
+  const qs=sel?[sel]:QS();
+  if(!B){
+    qs.forEach(q=>{g.strokeStyle=colOf(q);g.globalAlpha=sel?1:0.28;series(g,c.s[q],PL,w,y,!!sel);});
+  }else{
+    const X=i=>PL+(i-lo)/(hi-lo+1)*w;
+    qs.forEach(q=>{
+      const sums=B.sums[q];g.fillStyle=colOf(q);g.globalAlpha=sel?0.75:0.16;
+      for(let b=0;b<B.edges.length;b++){
+        const [a,e]=B.edges[b];
+        if(e<=lo||a>hi)continue;
+        const x0=X(Math.max(a,lo)),x1=X(Math.min(e,hi+1));
+        g.fillRect(x0,Math.min(y(0),y(sums[b])),Math.max(1,x1-x0-1),Math.abs(y(sums[b])-y(0)));
+      }
+    });
+  }
+  g.globalAlpha=1;
+  const cx=PL+(pos-lo)/(hi-lo)*w;
+  g.strokeStyle=css('--ink-2');g.setLineDash([3,3]);g.beginPath();
+  g.moveTo(cx,PT);g.lineTo(cx,H-PB);g.stroke();g.setLineDash([]);
+  const what=B?`&Sigma;s per ${gran==='sent'?'sentence':'paragraph'}, ${B.edges.length} of them`
+              :'s per token';
+  const how=fitted?`fitted to ${esc(sel)}`
+          :yfit==='query'?'shared — pick a query to fit'
+          :'shared across all queries';
+  $('sscale').innerHTML=`<span>${what} · &plusmn;${mx<10?mx.toFixed(2):mx.toFixed(1)}</span>`+
+    `<span class="dim">${how}</span>`;
+}
+
+function b64bytes(s){
+  const b=atob(s),u=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+  return u;
+}
+
+// unpack() already decoded the shard, so this is just a guard for a query with no
+// candidate data - kept as a function so the drawing code below is unchanged.
+function candOf(c,q){
+  const D=c.cand;
+  return D&&D.alpha[q]?D:null;
+}
+
+// The Eq 12 reweighting at one position: delta(v) proportional to A(v)*alpha(v),
+// normalised over the candidates at that position. That normalisation is per position,
+// which is exactly why these numbers are read one token at a time and never added up.
+function drawCand(){
+  const c=C(),box=$('cand');
+  const note=t=>{box.innerHTML=`<p class="hint" style="margin:0">${t}</p>`;};
+  if(!c.cand)return note('No candidate breakdown was exported for this run.');
+  if(!sel)return note('Pick a query first &mdash; &alpha;(v) is the belief that query would '+
+    'hold after each candidate, so the reweighting only exists one query at a time.');
+  const D=candOf(c,sel);
+  if(!D)return note(`Nothing stored for ${esc(sel)}.`);
+  const AL=D.alpha[sel];
+  const j=D.at[pos];
+  if(j===undefined){
+    let near=-1,best=Infinity;
+    for(const tk of D.t){const d=Math.abs(tk-pos);if(d<best){best=d;near=tk;}}
+    note(`Candidates are stored at the ${num(D.t.length)} loudest tokens of this chain, `+
+      `of ${num(c.n)}. Nearest is token ${num(near)}, ${num(best)} away &mdash; `+
+      `<button class="zbtn" id="cjump">jump there</button>`);
+    $('cjump').onclick=()=>{pos=near;if(pos<lo||pos>hi){lo=0;hi=c.n-1;}render();};
+    return;
+  }
+  const a=D.off[j],b=D.off[j+1],rows=[];
+  let lw=[];
+  for(let i=a;i<b;i++)lw.push(D.a[i]+Math.log(Math.max(AL[i],1e-8)));
+  const mxw=Math.max(...lw);
+  let z=0;for(const w of lw)z+=Math.exp(w-mxw);
+  for(let i=a;i<b;i++){
+    rows.push({tok:c.cand.vocab[D.v[i]],A:Math.exp(D.a[i]),al:AL[i],
+      d:Math.exp(lw[i-a]-mxw)/z,real:(i-a)===D.r[j]});
+  }
+  rows.sort((x,y)=>y.d-x.d);
+  box.innerHTML=`<table class="ctab"><thead><tr><th>token</th><th>A(v)</th>`+
+    `<th>&alpha;(v)</th><th>&delta;(v)</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr class="${r.real?'real':''}"><td class="tk">${esc(JSON.stringify(r.tok).slice(1,-1))}</td>`+
+      `<td>${r.A.toFixed(3)}</td><td>${r.al.toFixed(3)}</td>`+
+      `<td>${r.d.toFixed(3)} <span class="dbar" style="width:${(r.d*34).toFixed(0)}px"></span></td></tr>`).join('')+
+    `</tbody></table>`;
+}
+
+function drawQList(){
+  const c=C(),box=$('qlist');box.textContent='';
+  QS().map(q=>({q,a:c.alpha[q][pos],z:(c.alpha[q][pos]-c.meanA[q])/(c.sdA[q]||1)}))
+    .sort((u,v)=>v.a-u.a).forEach(r=>{
+    const b=document.createElement('button');
+    b.className='qr';b.setAttribute('aria-selected',sel===r.q);
+    b.innerHTML=`<span class="sw" style="background:${colOf(r.q)}"></span>`+
+      `<span><span class="nm">${esc(r.q)}</span>`+
+      `<span class="bb"><span style="position:absolute;inset:0 auto 0 0;width:${(r.a*100).toFixed(0)}%;background:${colOf(r.q)}"></span></span></span>`+
+      `<span class="vv">${r.a.toFixed(3)}<br><span style="color:var(--ink-3)">z${r.z>0?'+':''}${r.z.toFixed(1)}</span></span>`;
+    b.onclick=()=>{sel=sel===r.q?null:r.q;render();};
+    box.appendChild(b);
+  });
+}
+
+const SCAT={};
+function scatterLayer(c,W,H,PL,PT,w,hh,cap){
+  const key=[cur,sel,W,H].join(':');
+  if(SCAT.key===key)return SCAT.cv;
+  const dpr=window.devicePixelRatio||1,cv=document.createElement('canvas');
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  (sel?[sel]:QS()).forEach(q=>{
+    g.fillStyle=colOf(q);g.globalAlpha=sel?0.30:0.10;
+    const A=c.alpha[q],S=c.s[q];
+    for(let i=0;i<c.n;i++){
+      const x=PL+(Math.max(-cap,Math.min(cap,S[i]))+cap)/(2*cap)*w;
+      g.fillRect(x-0.6,PT+(1-A[i])*hh-0.6,1.2,1.2);
+    }
+  });
+  SCAT.key=key;SCAT.cv=cv;return cv;
+}
+
+function drawScatter(){
+  const c=C(),[g,W,H]=fit($('scatter'),240);
+  const PL=42,PR=10,PT=10,PB=26,w=Math.max(1,Math.round(W-PL-PR)),hh=H-PT-PB;
+  const cap=c.sCap;
+  g.clearRect(0,0,W,H);
+  g.strokeStyle=css('--rule-2');g.lineWidth=1;
+  g.fillStyle=css('--ink-3');g.font='9px ui-monospace,monospace';g.textAlign='right';
+  for(let v=0;v<=1;v+=0.25){
+    const y=PT+(1-v)*hh;
+    g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();
+    g.fillText(v.toFixed(2),PL-5,y+3);
+  }
+  const zx=PL+w/2;
+  g.strokeStyle=css('--rule');g.beginPath();g.moveTo(zx,PT);g.lineTo(zx,PT+hh);g.stroke();
+  g.drawImage(scatterLayer(c,W,H,PL,PT,w,hh,cap),0,0,W,H);
+  g.textAlign='left';g.fillStyle=css('--ink-3');
+  g.fillText('s '+(-cap).toFixed(1),PL,H-8);
+  g.textAlign='center';g.fillText('0',zx,H-8);
+  g.textAlign='right';g.fillText('+'+cap.toFixed(1),W-PR,H-8);
+  if(sel){
+    const x=PL+(Math.max(-cap,Math.min(cap,c.s[sel][pos]))+cap)/(2*cap)*w;
+    const y=PT+(1-c.alpha[sel][pos])*hh;
+    g.strokeStyle=css('--ink');g.lineWidth=1.4;
+    g.beginPath();g.arc(x,y,4.5,0,6.283);g.stroke();
+  }
+  $('scinfo').innerHTML=`<span>${num(c.n)} tokens${sel?'':' &times; '+QS().length+' queries'}</span>`+
+    `<span class="dim">y &alpha; · x s, clipped to &plusmn;${cap.toFixed(2)}`+
+    `${sel?' · ring marks the current token':''}</span>`;
+}
+
+function drawQDetail(){
+  const c=C(),box=$('qdetail');
+  if(!sel){
+    box.innerHTML=`<p class="hint" style="margin:0">Pick a query on the left to isolate its `+
+      `trajectory in both charts and read its proposition.</p>`;
+    return;
+  }
+  const text=c.qtext[sel]||'(proposition not recorded in this export)';
+  box.innerHTML=`<div class="qhead"><span class="sw" style="background:${colOf(sel)}"></span>`+
+    `<span style="color:${colOf(sel)}">${esc(sel)}</span>`+
+    `<span class="dim">${esc(CNAME[CLUSTER[sel]]||'')}</span></div>`+
+    `<div class="qtext">${esc(text)}</div>`;
+}
+
+function drawCot(){
+  const c=C(),box=$('cot');box.textContent='';
+  const before=document.createElement('span');before.className='dim';
+  before.textContent=c.toks.slice(0,pos).join('');
+  const hlt=document.createElement('span');hlt.className='hl';
+  hlt.textContent=c.toks[pos]||'';
+  const after=document.createElement('span');after.className='dim';
+  after.textContent=c.toks.slice(pos+1).join('');
+  box.appendChild(before);box.appendChild(hlt);box.appendChild(after);
+  // centre the scored token in the box without scrolling the page around it
+  const bt=box.getBoundingClientRect(),ht=hlt.getBoundingClientRect();
+  box.scrollTop+=(ht.top-bt.top)-box.clientHeight/2;
+  $('cotwarn').innerHTML=c.nFull>c.n+1
+    ?`<div class="warn">This chain runs to ${num(c.nFull)} tokens, but belief scoring stops at
+       the metric's 8,192-token <code>max_length</code>, which a larger generation cap does not
+       raise. The last ${num(c.nFull-c.n)} tokens were generated and are neither scored nor
+       shown — the chart ends before the reasoning does.</div>`
+    :'';
+}
+
+function drawZbar(){
+  const c=C();
+  $('zbar').innerHTML=`<button class="zbtn" id="rz">reset zoom</button>`+
+    `<span>showing ${num(hi-lo+1)} of ${num(c.n)} tokens</span>`+
+    `<span class="dim">scroll to zoom · drag to scrub · double-click to reset</span>`;
+  $('rz').onclick=()=>{lo=0;hi=c.n-1;render();};
+}
+
+function drawMeta(){
+  const c=C();
+  $('question').textContent=c.question;
+  const seen={};
+  $('legend').innerHTML=QS().map(q=>CLUSTER[q]).filter(k=>!seen[k]&&(seen[k]=1))
+    .map(k=>`<span><i style="background:var(--c-${k})"></i>${CNAME[k]}</span>`).join('');
+}
+
+function drawScrub(){
+  $('scrub').innerHTML=`<span>token <span class="tokchip">${num(pos)}</span></span>`+
+    `<span class="dim">${sel?'showing '+sel:'click a query to isolate it'}</span>`;
+}
+
+function render(){
+  const c=C();
+  if(hi<=lo){lo=0;hi=c.n-1;}
+  pos=Math.max(lo,Math.min(hi,pos));
+  drawMeta();drawChart();drawS();drawScatter();drawQList();drawQDetail();drawCand();
+  drawCot();drawZbar();drawScrub();
+}
+
+function xToTok(ev,cv){
+  const r=cv.getBoundingClientRect(),PL=42,PR=8;
+  const w=r.width-PL-PR,f=((ev.clientX-r.left)-PL)/w;
+  return Math.max(lo,Math.min(hi,Math.round(lo+f*(hi-lo))));
+}
+['chart','schart'].forEach(id=>{
+  const cv=$(id);let down=false;
+  const scrubTo=e=>{pos=xToTok(e,cv);
+    drawChart();drawS();drawScatter();drawQList();drawQDetail();drawCand();
+    drawCot();drawScrub();};
+  cv.addEventListener('pointerdown',e=>{down=true;cv.setPointerCapture(e.pointerId);scrubTo(e);});
+  cv.addEventListener('pointermove',e=>{if(down)scrubTo(e);});
+  cv.addEventListener('pointerup',()=>down=false);
+  cv.addEventListener('pointercancel',()=>down=false);
+  cv.addEventListener('dblclick',()=>{lo=0;hi=C().n-1;render();});
+  cv.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const c=C(),at=xToTok(e,cv),k=e.deltaY<0?0.72:1/0.72;
+    let span=Math.max(24,Math.min(c.n,Math.round((hi-lo+1)*k)));
+    lo=Math.max(0,Math.min(c.n-span,Math.round(at-(at-lo)*k)));
+    hi=Math.min(c.n-1,lo+span-1);
+    render();
+  },{passive:false});
+});
+window.addEventListener('resize',()=>{drawChart();drawS();drawScatter();});
+$('find').addEventListener('input',e=>{filter=e.target.value;CASES_INIT();});
+
+
+async function start(password){
+  const msg=$('gatemsg');
+  msg.className='gatemsg busy';msg.textContent='deriving key\u2026';
+  $('go').disabled=true;
+  try{
+    const info=await (await fetch(DATA+'keyinfo.json')).json();
+    KEY=await deriveKey(password,info);
+    msg.textContent='decrypting index\u2026';
+    MAN=await fetchJson('manifest.enc');
+  }catch(e){
+    KEY=null;
+    msg.className='gatemsg bad';
+    msg.textContent=/operation-specific reason|OperationError|decrypt/i.test(String(e))
+      ?'wrong password':'could not load: '+e.message;
+    $('go').disabled=false;$('pw').select();
+    return;
+  }
+  $('gate').hidden=true;
+  GRAN_INIT();CASES_INIT();drawRunWarn();
+  await open_(MAN.cases[0].idx);
+}
+
+$('gateform').addEventListener('submit',e=>{e.preventDefault();start($('pw').value);});
+$('find').addEventListener('input',e=>{filter=e.target.value;CASES_INIT();});
+
+</script>
