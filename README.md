@@ -15,6 +15,21 @@ Belief scoring is a pilot over the three shortest chains against the full 20-que
 For every token it carries the belief `alpha`, both estimators of the pointwise
 information `s`, the cumulative products `beta` and `phi`, and a per-candidate breakdown.
 
+## The planet case
+
+<https://lm-mindreader.github.io/planet-case/> — open, no password.
+
+Qwen2.5-1.5B-Instruct answering "Name your favorite planet" eight times at temperature 1.0,
+scored against six queries: one per planet plus `refuses_to_choose`.
+It reproduces the worked trajectory in Sec 8.1 on the model that section was measured on.
+
+Chain 4 refuses, then names Neptune at token 21.
+That single token moves the belief in Neptune +0.32 and every rival planet down by 0.45 to
+0.61, while `refuses_to_choose` peaks on a different token entirely — ` preferences`, in
+"I do not have personal preferences".
+Chains 1, 2, 3, 5 and 6 never name a planet and every planet belief stays flat, which is
+what makes the jump a reading of content rather than of position.
+
 ## Opening it
 
 The page asks for a password.

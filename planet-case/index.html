@@ -1,0 +1,677 @@
+<title>Belief Trajectories</title>
+<style>
+:root{
+  --paper:#F4F6F7;--surface:#FFFFFF;--sunk:#EAEEF0;--ink:#16202B;--ink-2:#48586A;--ink-3:#7C8B9B;
+  --rule:#D6DEE3;--rule-2:#E7ECEF;--accent:#0F6F78;--accent-soft:#DCEDEE;
+  --ok-bg:#E2EFE6;--ok-ink:#2F6B44;--bad-bg:#FBEAE4;--bad-ink:#9C3E1E;--neu-bg:#EDEEF0;--neu-ink:#5C6976;
+  --warn-bg:#FBF3E2;--warn-ink:#7A5A1E;--warn-rule:#E6D3A8;
+  --c-task:#6B7A89;--c-sol:#0F6F78;--c-beh:#B4762F;--c-self:#3E7D5A;--c-inf:#8E4A82;
+  --serif:ui-serif,Georgia,'Iowan Old Style','Times New Roman',serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0D1318;--surface:#151D24;--sunk:#111920;--ink:#DCE5EB;--ink-2:#93A5B4;--ink-3:#6B7C8B;
+  --rule:#243039;--rule-2:#1C262E;--accent:#4FBAC3;--accent-soft:#123034;
+  --ok-bg:#17301F;--ok-ink:#8DC79F;--bad-bg:#331F19;--bad-ink:#E09B7B;--neu-bg:#1D262D;--neu-ink:#8B99A6;
+  --warn-bg:#2B2415;--warn-ink:#D9BC7C;--warn-rule:#4A3D20;
+  --c-task:#93A3B2;--c-sol:#4FBAC3;--c-beh:#DFA45C;--c-self:#6FB98C;--c-inf:#C888BA;
+}}
+:root[data-theme="dark"]{
+  --paper:#0D1318;--surface:#151D24;--sunk:#111920;--ink:#DCE5EB;--ink-2:#93A5B4;--ink-3:#6B7C8B;
+  --rule:#243039;--rule-2:#1C262E;--accent:#4FBAC3;--accent-soft:#123034;
+  --ok-bg:#17301F;--ok-ink:#8DC79F;--bad-bg:#331F19;--bad-ink:#E09B7B;--neu-bg:#1D262D;--neu-ink:#8B99A6;
+  --warn-bg:#2B2415;--warn-ink:#D9BC7C;--warn-rule:#4A3D20;
+  --c-task:#93A3B2;--c-sol:#4FBAC3;--c-beh:#DFA45C;--c-self:#6FB98C;--c-inf:#C888BA;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px 64px}
+h3{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:0 0 .7rem;font-weight:500}
+header{padding:26px 0 20px;border-bottom:1px solid var(--rule)}
+.handle{font-family:var(--mono);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 14px}
+
+.pickbar{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+.runs{display:flex;gap:0}
+.rb{font:inherit;font-family:var(--mono);font-size:.72rem;background:var(--surface);border:1px solid var(--rule);
+  color:var(--ink-2);padding:.4rem .8rem;cursor:pointer;display:flex;flex-direction:column;gap:1px;text-align:left}
+.rb+.rb{margin-left:-1px}
+.rb:hover{color:var(--accent)}
+.rb[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);position:relative;z-index:1}
+.rb .rn{font-weight:600}
+.rb .rm{font-size:.64rem;color:var(--ink-3)}
+.rb[aria-selected="true"] .rm{color:var(--accent)}
+.find{flex:1 1 240px;min-width:0;font:inherit;font-family:var(--mono);font-size:.75rem;
+  background:var(--surface);border:1px solid var(--rule);color:var(--ink);padding:.4rem .7rem}
+.find::placeholder{color:var(--ink-3)}
+.find:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.pcount{font-family:var(--mono);font-size:.7rem;color:var(--ink-3);align-self:center;white-space:nowrap}
+
+.cases{margin:10px 0 0;max-height:184px;overflow:auto;border:1px solid var(--rule-2);background:var(--surface)}
+.cr{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:12px;align-items:center;
+  width:100%;padding:.4rem .7rem;background:none;border:0;border-bottom:1px solid var(--rule-2);
+  font:inherit;color:inherit;text-align:left;cursor:pointer}
+.cr:last-child{border-bottom:0}
+.cr:hover{background:var(--sunk)}
+.cr[aria-selected="true"]{background:var(--accent-soft)}
+.cr .ci{font-family:var(--mono);font-size:.72rem;color:var(--ink-2);white-space:nowrap}
+.cr[aria-selected="true"] .ci{color:var(--accent);font-weight:600}
+.cr .cq{font-size:.78rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr .cn{font-family:var(--mono);font-size:.7rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.cr .cd{width:7px;height:7px;border-radius:50%;display:block}
+.cr .thin{color:var(--warn-ink);background:var(--warn-bg);padding:0 .25rem;border-radius:2px}
+.empty{padding:.8rem;font-family:var(--mono);font-size:.72rem;color:var(--ink-3)}
+
+.warn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-rule);padding:9px 13px;
+  font-family:var(--mono);font-size:.72rem;line-height:1.55;margin:10px 0 0}
+.layout{display:grid;gap:18px;margin-top:22px;grid-template-columns:1fr}
+@media(min-width:1000px){.layout{grid-template-columns:minmax(0,1fr) 310px}}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--rule-2);padding:17px 19px}
+.qbox{font-size:.9rem;white-space:pre-wrap;font-family:var(--mono);line-height:1.65;max-height:210px;overflow:auto}
+.qlist{display:flex;flex-direction:column;gap:1px;max-height:460px;overflow:auto}
+.qr{display:grid;grid-template-columns:9px 1fr auto;gap:7px;align-items:center;padding:3px 5px;cursor:pointer;background:none;border:0;font:inherit;color:inherit;text-align:left;width:100%}
+.qr:hover{background:var(--sunk)}
+.qr[aria-selected="true"]{background:var(--accent-soft)}
+.qr .sw{width:9px;height:9px;border-radius:1px}
+.qr .nm{font-family:var(--mono);font-size:.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qr .vv{font-family:var(--mono);font-size:.7rem;font-variant-numeric:tabular-nums;color:var(--ink-2);text-align:right}
+.qr .bb{height:3px;background:var(--sunk);position:relative;margin-top:2px}
+.hint{font-size:.75rem;color:var(--ink-3);margin:0 0 11px;line-height:1.5}
+.hint b{font-weight:600;color:var(--ink-2)}
+.cot{font-family:var(--mono);font-size:.78rem;line-height:1.85;max-height:300px;overflow:auto;background:var(--sunk);padding:13px 15px;white-space:pre-wrap;word-break:break-word}
+.cot .hl{background:var(--accent);color:var(--paper);font-weight:600;padding:.05em .2em;border-radius:2px}
+.cot .hl:empty::after{content:'\200b'}
+.dim{color:var(--ink-3)}
+.scrub{font-family:var(--mono);font-size:.73rem;color:var(--ink-3);margin-top:9px;display:flex;gap:1rem;flex-wrap:wrap}
+.legend{display:flex;gap:.9rem;flex-wrap:wrap;font-family:var(--mono);font-size:.68rem;color:var(--ink-2);margin-top:10px}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:.3rem}
+.qtext{font-family:var(--mono);font-size:.78rem;line-height:1.7;background:var(--sunk);padding:11px 13px;
+  white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}
+.qhead{display:flex;align-items:center;gap:7px;margin-bottom:8px;font-family:var(--mono);font-size:.72rem}
+.qhead .sw{width:9px;height:9px;border-radius:1px;flex:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cv{position:relative;width:100%;overflow:hidden}
+canvas{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none}
+.zbar{display:flex;gap:8px;align-items:center;margin-top:8px;font-family:var(--mono);font-size:.7rem;color:var(--ink-3);flex-wrap:wrap}
+.zbtn{font:inherit;background:var(--sunk);border:1px solid var(--rule-2);color:var(--ink-2);padding:.2rem .5rem;cursor:pointer}
+.zbtn:hover{border-color:var(--accent);color:var(--accent)}
+.controls{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 10px}
+.gran{display:flex;gap:0}
+.gb{font:inherit;font-family:var(--mono);font-size:.68rem;background:var(--surface);
+  border:1px solid var(--rule);color:var(--ink-2);padding:.2rem .6rem;cursor:pointer}
+.gb+.gb{margin-left:-1px}
+.gb[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);position:relative;z-index:1}
+.ctab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.7rem;
+  font-variant-numeric:tabular-nums}
+.ctab th{text-align:right;font-weight:500;color:var(--ink-3);padding:2px 5px;
+  border-bottom:1px solid var(--rule-2);white-space:nowrap}
+.ctab th:first-child,.ctab td:first-child{text-align:left}
+.ctab td{padding:2px 5px;border-bottom:1px solid var(--rule-2);text-align:right;white-space:nowrap}
+.ctab tr.real td{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.ctab .tk{max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.dbar{display:inline-block;height:3px;background:var(--accent);vertical-align:middle}
+.abar{display:inline-block;height:3px;background:var(--ink-3);vertical-align:middle}
+.tokchip{font-family:var(--mono);background:var(--accent-soft);color:var(--accent);padding:.05em .3em;border-radius:2px}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="handle" id="handle">Belief results</div>
+  <div class="pickbar">
+    <div class="runs" id="runs" role="tablist"></div>
+    <input class="find" id="find" type="search" autocomplete="off"
+           placeholder="filter by subject, index or question">
+    <span class="pcount" id="pcount"></span>
+  </div>
+  <div id="runwarn"></div>
+  <div class="cases" id="cases" role="listbox" aria-label="chains of thought"></div>
+</header>
+
+<div class="layout">
+  <div class="col">
+    <div class="panel">
+      <h3>The problem</h3>
+      <div class="qbox" id="question"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Belief &alpha;</h3>
+      <div class="cv"><canvas id="chart" height="300"></canvas></div>
+      <div class="legend" id="legend"></div>
+      <div class="scrub" id="scrub"></div>
+      <div class="zbar" id="zbar"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Pointwise information s</h3>
+      <div class="controls">
+        <div class="gran" id="gran" role="tablist"></div>
+        <div class="gran" id="yfit" role="tablist"></div>
+      </div>
+      <div class="cv"><canvas id="schart" height="150"></canvas></div>
+      <div class="scrub" id="sscale"></div>
+    </div>
+
+
+    <div class="panel">
+      <h3>The chain of thought</h3>
+      <div class="cot" id="cot"></div>
+      <div id="cotwarn"></div>
+    </div>
+    <div class="panel">
+      <h3>Belief &alpha; &times; pointwise information s</h3>
+      <div class="cv"><canvas id="scatter" height="240"></canvas></div>
+      <div class="scrub" id="scinfo"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h3>Queries</h3>
+      <div class="qlist" id="qlist"></div>
+    </div>
+    <div class="panel">
+      <h3>Query</h3>
+      <div id="qdetail"></div>
+    </div>
+    <div class="panel">
+      <h3>Candidates at this token</h3>
+      <div id="cand"></div>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+const RAW={"commit":"","runs":[{"name":"PlanetCase","tag":"PlanetCase","cap":"","model":"Qwen/Qwen2.5-1.5B-Instruct","sLo":-9.670781135559082,"sHi":2.21867299079895,"nGen":8,"nQueries":6,"nShown":8,"nScored":8,"nPos":498,"rows":2988,"cases":[{"id":"planet_favorite#0","subject":"planet_favorite#0","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"As an AI language model, I don't have personal preferences or emotions, but I can tell you that Earth is the planet I am most familiar with, as everyone has grown up on it and it is the only place known to support life. However, if I had to choose a favorite planet, my choices might vary depending on the context and circumstances.","correct":null,"finish":"stop","truncated":false,"n":72,"nFull":72,"toks":["As"," an"," AI"," language"," model",","," I"," don","'t"," have"," personal"," preferences"," or"," emotions",","," but"," I"," can"," tell"," you"," that"," Earth"," is"," the"," planet"," I"," am"," most"," familiar"," with",","," as"," everyone"," has"," grown"," up"," on"," it"," and"," it"," is"," the"," only"," place"," known"," to"," support"," life","."," However",","," if"," I"," had"," to"," choose"," a"," favorite"," planet",","," my"," choices"," might"," vary"," depending"," on"," the"," context"," and"," circumstances",".",""],"alpha":{"picks_earth":"O0gnKUYgaSyNMLMs7zeESAgVNx69H1AmFx+xGKQlLUMFO2phAX9RSzdZFuf13RDac+DR36bgRd0S5xbuPuer1ie+XcMS5x3kEOGQ6E3kE+iv5D7nBew07sfs4+ty6fzzHPSUsL+mIJXqj7iXYbAExw/LfM821Ju08aiftEvJrNLmtyik2ZvwwXWrmsVYxhbZ","picks_jupiter":"HzIXH1EqwCfjLiUl/ks8X4kYNR1qIu8kIyQoHEspBk+VRmRg4HXZRCRD+w3iJcYeIzB6I7MUFCX7GUUQPhlcEc8tBClZErMUgyRqEDsciBiXHJUdFCc+GVMRsysKH9cH1QWjJ78zNVS6Rt9b41fMiO1hKor1Yf1c6lijc3x/nDtHR5dpn1ScOzxfnDtUKb8h","picks_mars":"2UR7HrcrMC2+MjUi2UJcY9cY0RSII2sosiRQG9kt4VogXAJ4mpXbUZRaoxupHTsZvj6BHBUyWCEwLM0Ukh4YGjAvqyL3FsUXRBpqEIgYoxRGEYEcRRtFIAwZzhM2FpQMdwlyH9kt5jNDK/EvqTWuaRpHyGfqfwxcP03bZLGMQ1zhTaBoBUmaWgZKOFeaN4g1","picks_neptune":"ZkYeKiEwszLSOFUrPjsgXLUWxhqgJtMtDSmzIoou0UTYUFJrE3/wTMJHsxQZIfgjeDJPKgoieiMaIf4SJxVTEdktUSo2FckVBiLUEK4Z4hgcHO0f4iXaGSwWqx7pGSkKgwVfIi4xFUK+MpU2oj0LVhJKP1umYFNdGkdkYGphPkP0ONJQB0HwPONAFz2XJ/Ur","picks_saturn":"9UeSJIstgyrbLPkj9EzvXZAVkBVZH/MoNCu6Iqwxk1FHVxd3tIWvR8JUiQcMGd0Uqw7iGA4JFxd5DHsFHAfCBH8dshYGCEEIWg7HBIMLYwu8CbUIaQ8SC9cHSh/sDeAD+AMqELQWJEpOPVJDGEEca9hQUWcMSutJCk1CZRliQyFlSHxxEkqXJ5RPSh9XFT4T","refuses_to_choose":"uRafEjkSCxQpGaASVBVcISoSAhPCEAJ4eCRXSLoeLjeqM0wvmE1wN5I4iiJPJqEwvj6qM9hBAC/ZRKdBVjtDNAczij5aN/ZCKDUYSt4vHio2MbMu6ztSQ1hHkkCoNAg75zADOQI+j0BrT040z0VeMQo2B0C+Pr8j3iNeMRw/UUvhP/cfMDTIPCE0w0LuQkRA"},"s":{"picks_earth":"lsvXz9nR9dE60ArQyM9mxznQM9ClzwLQx8+YzY3SetA30G7Px8050ODe//9F18PPlr9psQbSucif0TbQrsiyyEvUsctg4TzQPcfn0NTQ9s/3z37UJNGOyIvAQtAD0WXRcspmwDrQdM4Q1GDPMNBMyKnR/8+H1NDQtMqcsOvAe8aWzjrQxdG51U7Phtkb0FnJ","picks_jupiter":"n8eXzyzSs9I60B/Qds/UyDnQGdBP0DTQ0c/tzZfSRdkp0BDQe8c60JfbSDtI0vvF+9bD6vzO89EfzzvQ79Vyy2bNw9FazjHQD8hPyQnQ7chR0CfQSM10zaDPS9Ds0PjRTNJI7jrQh87900/PPtBlx6TSzM5R0zfNR+wgqmu+o7WwzDrQ5tQ41MXPrdG3z5qz","picks_mars":"UcnQz6/SVNM60BvQkM+SxznQHNBm0C3QI9BLzpHSStlk0LvPmMk60F3dNWmN0WjMisgB3zXNjdI1zzrQX9Zhyp/U4svH1zfQBMpYzm3OKM4K0vXQpdGrz97VV9Ce0K/R69B+6zrQ6tBm1f/PQdDzyEjQ688N1APObeY3ojm8C7tMzDrQddXg1dTOqNZt0O24","picks_neptune":"E8hOzx7RT9I60CjQl88RyTnQHtBt0DTQcNDZzT/Sb9mU0ATQv8c60L7bOCUg0+fI69aY7S/P4NCmzjvQZNVly6DOxs3HzTHQ+MnHyfrPW8oLzwHPtMwmzdDOP9Cx0OfRBdAF7jrQBM2S1DXPQdA3xnbTe8z2033NleLOqLPAi7W4zDrQs9U21HfOc9Nv0Ee2","picks_saturn":"KsZ/z6XRfdI60CbQf89VyjnQH9BI0ETQFtB0zT/SJdtR0BfQVcc60Aba0jAB0l3MBtVj6pfQOdGjzzvQGdcWy8jZU82gxjDQX8gxybTO/ccZ0LjQV84tzefSTNCD0GTSa9LH6jrQwcjR007PQNDoxR/USc6y02HMleNyq8DAZbbbzDrQBNSy0QPQv84v0E+w","refuses_to_choose":"Asw/0M3Je9U60DTQ9s8NwzjQ6c9qz7nOI9Eh0q3S2Jae0fvPXsY60M7SFM5mz53R6L/PeJ/Qxckk0DrQYdVKz23PAcmMyy7QXtASz1jRItGozkzSttAW0R7QLNC7zwLR1Mx81DrQk7iG0MnLP9DzzxXRMsBnxUfJQ82pzDHFr8zMzzrQI9HPy1LNj9jnznrJ"},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,49],"para":[0]},"cand":null,"sCap":7.7099,"sMax":7.9422,"sOver":1,"meanA":{"picks_earth":0.6361,"picks_jupiter":0.2089,"picks_mars":0.2109,"picks_neptune":0.1958,"picks_saturn":0.1708,"refuses_to_choose":0.2027},"sdA":{"picks_earth":0.2922,"picks_jupiter":0.1277,"picks_mars":0.1293,"picks_neptune":0.1001,"picks_saturn":0.1334,"refuses_to_choose":0.072}},{"id":"planet_favorite#1","subject":"planet_favorite#1","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"As an artificial intelligence, I don't have the capability to have personal preferences such as favorites. My purpose is to assist and provide information to the best of my abilities. Would you like me to provide you with some interesting facts about the planets?","correct":null,"finish":"stop","truncated":false,"n":50,"nFull":50,"toks":["As"," an"," artificial"," intelligence",","," I"," don","'t"," have"," the"," capability"," to"," have"," personal"," preferences"," such"," as"," favorites","."," My"," purpose"," is"," to"," assist"," and"," provide"," information"," to"," the"," best"," of"," my"," abilities","."," Would"," you"," like"," me"," to"," provide"," you"," with"," some"," interesting"," facts"," about"," the"," planets","?",""],"alpha":{"picks_earth":"O0gnKYEtgR5zG8Anczo3ELgXUguxEJYXQBTlF5U2gydgKSIsqjPdM9czqjOzMvcpdydaJ5UaFjUGIjUiVStzG7UhYyHBFDAXgR5zG7EY3BJ2D4UMUQ0BFAYTFRV3D6kOqQ4HDQ==","picks_jupiter":"HzIXHzU1VyA2GeYzNVTbD6sewQlUFJATyRI9FI4viygSN4ouEjGQKnYrRi6IJ9ktZB+rIg8jHipaKG4gnyQlJawx6SffFW0c3B5rGU8aghFDD9MLnxUYGpEdmBgfFEAc3B7CHw==","picks_mars":"2UR7HlEqqB9qGWUu/kuoEDUdCA+AFLUXtRdAHF06xTDWN9czAENzOAU7bjMkPtczkCpiI1kfAT0fMnUkJDOII2kt1CjtGB4bDyKHGUwbFBJgDwUNaRMzGD4jXhVrE4IWvSB0HQ==","picks_neptune":"ZkYeKr4yYSGWFy4lakULEL4a7A6fEvwWjBKTGqozMSvjMU8p4S8NKRkyEjF1MN8rJSNRKrMiBjcwL18imjAuJaA0YjFCGWoi+SOIIzceiRikFL8OcxvCH2UY6iWMH70rKTABLQ==","picks_saturn":"9UeSJHUwhB1nGgM591f6EcoZ+gmLFNkS2RPsHQ1CYClqOJc1KTDXM+0fez+DN4M36iGDKpcsdjOqM2ktaS2zLrQ6PTVnFuwg5iWKJb0ihxnKFC0OjBy1IcQaVCe3I7sndCpGLg==","refuses_to_choose":"uRafEpwSUg/GCq4X3BarEegOixHXET4NuQznDF8+WRVPGSFSFXADOSkooyfrO1FLCiIcLo5kGTwKNtlEuhzpJBnaQrhBMFQVLmOQO6c9nmOOawJ4nmN/SnIZ/i8dTewXSzIGHQ=="},"s":{"picks_earth":"BMy6z8DJN9BnzdbPbMo40DjQUdXq2HfQds/ozE7QV9A60HHQfs6hyQPPONA20GnOKdBL0JfMBdCR0DrQOtA50CPP3NFXvzvQNdDk1TrQy9thzznQXs9l0E7QadInsfGYrsYt0A==","picks_jupiter":"LciTz2LHNtDuzszPcMs40CrQEsvm2IrQrc9/0NvPFs460B3NAM5etXLPN9A60H3OLtBZ0NLPts/G0D7QOtA50LjMK9BmyDzQPtAv1jrQiOGq0TrQBswv1ITQPNMNrb6G6tIv0A==","picks_mars":"BsnJzz/FN9DszdzPqso50CfQCsus2nfQnM/zzyLQjtU60EbMmM3dtyXPONA40P3O0dBG0MnNW9C50DvQOtA50LjM19GWwjzQOtBf1jrQweC6zjrQ58xe0nbQadL6nyiP8c820A==","picks_neptune":"88dMz7LLONAi0NjPk8s40CrQachF2oXQgc8V0N7PD9M60AfOMM52v/jON9A70H7O7c9U0L7PXc9h0T7QOtA60GHLzNAGyjzQPtBK1TrQ9t+azzrQk83c1IrQ39LFtNF00dA00A==","picks_saturn":"hcVlz4fJONAEz8jPZMw50CPQuc3i2I3Qzc/J0ODPWNA60GvN1s7GsgXPONA50HrOLtBY0AnPKNBR0T3QOtA60HnN4dC7yDzQQNBg1jrQjOJk0TrQv8p61IbQ39Khr86G89Mq0A==","refuses_to_choose":"7Ms90BnbOtDiy+bPnMU00HrPm+KZ2ufP8cqO0PLRvt060AnRJtGK8xXROtA60ITOz8950OTQKdA80UDQOtA60MDQhM0dxTvQOdBqyTrQU8jQzzrQ4NjZ1mjQHNFg1ZvRk8g60A=="},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,19,34],"para":[0]},"cand":null,"sCap":3.9964,"sMax":4.2453,"sOver":1,"meanA":{"picks_earth":0.1249,"picks_jupiter":0.132,"picks_mars":0.1453,"picks_neptune":0.1473,"picks_saturn":0.1576,"refuses_to_choose":0.2103},"sdA":{"picks_earth":0.0569,"picks_jupiter":0.0531,"picks_mars":0.0625,"picks_neptune":0.0503,"picks_saturn":0.0614,"refuses_to_choose":0.1675}},{"id":"planet_favorite#2","subject":"planet_favorite#2","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"As an AI assistant, I don't have personal preferences or emotions, but I'm here to assist with any questions or tasks you have to the best of my abilities. If you have any specific questions about planets or anything else, feel free to ask!","correct":null,"finish":"stop","truncated":false,"n":52,"nFull":52,"toks":["As"," an"," AI"," assistant",","," I"," don","'t"," have"," personal"," preferences"," or"," emotions",","," but"," I","'m"," here"," to"," assist"," with"," any"," questions"," or"," tasks"," you"," have"," to"," the"," best"," of"," my"," abilities","."," If"," you"," have"," any"," specific"," questions"," about"," planets"," or"," anything"," else",","," feel"," free"," to"," ask","!",""],"alpha":{"picks_earth":"O0gnKUYg6BtiEhM0nz9pE4UTahyjJhgXNhZ9HlFLizSNMIBsfUX+WYBXckGLOxY1uEcFO90zSDFVKwU7tzWWNIo+oDTeNvgcch/jHYQYJR/pJ6AmbxbpJ9stSCA9GYstUR3DK/A0/zU=","picks_jupiter":"HzIXH1EqqyKEEwA/OVm1F+MdgR5aKLccqx4GIm1TZUiCQOFwIkWNXAxUrj2LOzIofTPPLVUrMC8eKr4yrS7mJqs3kS9OLYgelhfgH5cbnB24JIQuYSFOLasmhB69K04sARuzHPMq/yg=","picks_mars":"2UR7HrcruyPdDycpIkXZEMYVARQPJiEZ/BkKJHNTuUMwNLx3wlIDXWNe6kADObMuM0BGLf4ssy5mKB8yKDLRMTMz/TB8LlAboReHGekU7xgnH0YuUCZOLZsviiWyJAQ6vSB8LsI4Oiw=","picks_neptune":"ZkYeKiEwmDHiGJg3TU38GVEdbiCOLSUjwyVoMV5S+UWKPtBv5FGsYv5hGEoYSnUwvj6rN/43Azk5NgM57TQ5NvNA7TTXMdMgNx6DI3AcCyHxK106vSsNNx8/TiwfMiRDuycxK/8zrjQ=","picks_saturn":"9UeSJIstHCcnFZM5TF86GmwjJSHKMYQd2yyWNFhVa08kSp58bFYJcuhmAlZTUTk2IESyPQ8+8j7dMLxDzj4NN/BMeUIZN+Ej9iDpJ/MiwiPXLQIvaS3ALp41djODN6U8xCJvJ5s03DE=","refuses_to_choose":"uRafEjkSZyALEesXtxzoDs8MaxFhgxIYYFNsGU40sy6gJhQ0CiOqKm8tdRw4P5owy0saGTcvn0L2QpNSuS5GLe5FtEnmJlkfZyApGUUiMjGPIow/5kD+M8oqYSG7IKoz2ClcLtpLaDk="},"s":{"picks_earth":"BMy6z9PRnsuSz+zORcc40CHQpc/yz+jOZMmf0h3ZXtCN3x7ELNC0xi3QjM8i03fIaNci0OjOhMIo0DrQOtA60PjRqNAc0RDQ284t0PbFbtDYvBXDOs4bzTnQHtDpzzrQOtBB0PXPDtA=","picks_jupiter":"LciTzybSFMjWz5TOr8c50BTQFdAK0O3PdMpj1K7gZ9D90hW1KNAgwmjYBdDX0pPKSNU40HvN5b8a0DrQOtA60N/RttDB0xTQ0M3az3G5Wc/Yx0enKdAzzTrQGNAI0DrQOtA+0PHPEdA=","picks_mars":"BsnJz7TSjsr4z7vOKsY50BLQEtAh0MTPRclO0+rhe9AK2C26HtAUw2nWrc/X0pTIJdUu0FvPqr0r0DrQOtA60FzQwtBx0xHQBs8r0NG5jM+CulWtTc8e1TrQHtD3zzrQOtBC0PvPDtA=","picks_neptune":"88dMzxTRPMjiz+TOUcg50AvQMNAD0PXPrsqx0rLgntCV1Q64KNAPwHDYd9Bp0pTIP9Iv0C3OI8Ai0DrQOtA60FDQrNCp0hbQyM4F0M+7zs64w6OiLdBf0UDQGdAe0DrQOtA/0BTQFNA=","picks_saturn":"hcVlz5rR4Mn+z3nOgcg50A3QItAd0BPPpcrk07ngitCR1fq1KdBevXDYmNDx0ZrINNM/0GPPWcIZ0DrQOtA60NDRoNCN0xvQ/M3pz7W7gs7ryZ+yIdD5wTTQFdAF0DrQOtA/0AvQEdA=","refuses_to_choose":"Asw/0M3Jt8rrzyDP+8g30MbP488Oz0vR2Nd907qQKNEp8hbYOtA51U3YmdBA0yvQotjwz9fQLtQ50DrQOtA60AnSX9AnxUrPjNML0QjA1s58jD/KMtMpzFDQR9As0DrQOtA/0EjQOtA="},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,34],"para":[0]},"cand":null,"sCap":3.0849,"sMax":3.1462,"sOver":1,"meanA":{"picks_earth":0.1822,"picks_jupiter":0.1807,"picks_mars":0.1827,"picks_neptune":0.2116,"picks_saturn":0.2237,"refuses_to_choose":0.1752},"sdA":{"picks_earth":0.0761,"picks_jupiter":0.0756,"picks_mars":0.0818,"picks_neptune":0.0728,"picks_saturn":0.086,"refuses_to_choose":0.0862}},{"id":"planet_favorite#3","subject":"planet_favorite#3","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"As an AI language model, I do not have personal preferences or emotions, so I don't have a favorite planet. However, I can tell you all the information you may need about the planets in our solar system.","correct":null,"finish":"stop","truncated":false,"n":45,"nFull":45,"toks":["As"," an"," AI"," language"," model",","," I"," do"," not"," have"," personal"," preferences"," or"," emotions",","," so"," I"," don","'t"," have"," a"," favorite"," planet","."," However",","," I"," can"," tell"," you"," all"," the"," information"," you"," may"," need"," about"," the"," planets"," in"," our"," solar"," system",".",""],"alpha":{"picks_earth":"O0gnKUYgaSyNMLMs7zerQ9MMZxa6H7crCho2FrYi/jbpHIQ1DymqKF4nqDhaKI4tlE+xQ2swADu4R481gzmBLQw7dSUZKrMuHzIhLIgjfh/GHZso+Bw2GRkh","picks_jupiter":"HzIXH1EqwCfjLiUl/ku5Q0MP1BOJGg8mqR1RGFMhvj63HFBWMiiINW8rkzlVK5owKE6MSVs8oj23XTMzPTX+KDY+wCffJHYrGCqfJKgf7CBnJIs0JSXNIQcy","picks_mars":"2UR7HrcrMC2+MjUi2ULZRNwLCw1zGy4lFx8DFlUrrEEZIZ9L/izIKIM5UT0yKN42aljUU5U2rj3TXN0/JD7INmBCyB1lLtcxAi9IJKoo7CBIJNY6pCWEHl4n","picks_neptune":"ZkYeKiEwszLSOFUrPjvZRCQQ8A8lI+cqIyTcG50sKz0lJSVNji/kKIo+lEWOLaA0mlpqWKtDH0jIX4M30D/5N5lOfyxoMQQ6pTG5LqooJDMDPzVU3Dy5LjRJ","picks_saturn":"9UeSJIstgyrbLPkj9EwkQ9gOCw1wHIMnYyeIHPcsJEP5I2BTayjIKHI8HU3nKoM3mViZW6JEWEfoYHM4gj5GP4xLMDRgOigymy/RMRwsfiW+MiJF9jGqKIxA","refuses_to_choose":"uRafEjkSCxQpGaASVBVbH/MOORLpEQJ4uiJXSMEY9x9nFgcoqjMaGdlE6o/mw67C8EcAgBVwFXBLxriXDsJxlMKQIVJVjPuQ6o9DtEdoLmC/pkSnU1MmcRq1"},"s":{"picks_earth":"BMy6z9PRANE60APQys+I2znQINAF0AvQLdD7zLPSesoo0DLBOtAU0CrQMtA50PDPYNA60M3Kk86A2DnQAboD0j69/dsyyCfVuM691lDNy9CA0PjPOtCT08TG","picks_jupiter":"LciTzybS2NI50CHQns8m2jnQDdBF0DLQlND3zTDSPcYx0G2/OtAR0C/QJtA50MrPqdA60GzK6M8I0DrQUNdOyS7pX9o/zXfRf9CSxWfBkct90PjPOtCxzhi0","picks_mars":"BsnJz7TSodI50B/Qs89Q2jnQFdBS0DzQbdA/zf7Rg8Qn0InEOtAP0DDQK9A50OTPmdA60LzNpc9W1DrQzc3txo3mhN20x+XSj8+gxqDFcMx+0CXQOtBI0c63","picks_neptune":"88dMzxTRANM60B3Qrs8z2TnQEdBx0DfQXNAzzR/RBsUt0HnCOtAM0CzQItA50M/PetA60MDKzs/IzjrQR9Gsy0rrItx6zcPRR9Bgu/W5cMp+0AnQOtDZzWCv","picks_saturn":"hcVlz5rR89E60CfQh88k2TnQD9BU0DPQJ9ABziHR6sM00JnAOtAN0C7QKtA40NjPpdA60DbL8c8Q0DrQQtv4zSLu49ivyhbQj9CexXrBeMk10ObPOtATzTWo","refuses_to_choose":"7Ms90PPKHtU60C3Q6c/g3jrQYs+PzynPedD80sDTBtXczwulOdD5zzfPK9A50EzPSsw60GbSAdCXyDrQxcuXy7O+FtEaypzQCtCEzujPb9GA0BbQOtCR0FXP"},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,24],"para":[0]},"cand":null,"sCap":1.9661,"sMax":2.0056,"sOver":1,"meanA":{"picks_earth":0.1726,"picks_jupiter":0.1815,"picks_mars":0.1895,"picks_neptune":0.2161,"picks_saturn":0.2104,"refuses_to_choose":0.3575},"sdA":{"picks_earth":0.0564,"picks_jupiter":0.0665,"picks_mars":0.0714,"picks_neptune":0.0689,"picks_saturn":0.0736,"refuses_to_choose":0.2445}},{"id":"planet_favorite#4","subject":"planet_favorite#4","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"As an artificial intelligence, I do not have personal preferences or emotions. However, many people find the planet Neptune fascinating due to its dark blue color and distance from the Sun. It's the last planet in our solar system and is known for having the largest known ocean outside of Earth.","correct":null,"finish":"stop","truncated":false,"n":58,"nFull":58,"toks":["As"," an"," artificial"," intelligence",","," I"," do"," not"," have"," personal"," preferences"," or"," emotions","."," However",","," many"," people"," find"," the"," planet"," Neptune"," fascinating"," due"," to"," its"," dark"," blue"," color"," and"," distance"," from"," the"," Sun","."," It","'s"," the"," last"," planet"," in"," our"," solar"," system"," and"," is"," known"," for"," having"," the"," largest"," known"," ocean"," outside"," of"," Earth",".",""],"alpha":{"picks_earth":"O0gnKYEtgR5zG8AnaDEbCsYVXxipLu4UvxrvJM0/lUbYU1pw9nkLfgaYxyObEfMN1Qy1DGwMBgshDPYIPgulCEcHRA1VBqkHlAd6C0QN7A0qCR8I5AngCgsKCwpyCZsJFgpMCl8LcgkjB6gG5gxaCekGMgg=","picks_jupiter":"HzIXHzU1VyA2GeYzUjA/CAgX1xbSKz4VOhxrLMI7vUi0OqtpmnMDcgyN6QrICPYFBQfxBzYIKwdBCqQGCxCGCrAK4gsvBEINqQemCioVEQ8TDTQMyhCyDc8IBAmqDfEIEAjVCtUKcgrVCvoJhAhLCOgE0gQ=","picks_mars":"2UR7HlEqqB9qGWUugziAB5AVNhadLE0VYSESMXlChWX/ZaOGKahZnxS0dBgXCRgIcgejBgEGMAYXCVAF4gvOB84H7gehA8kG+QRoBwAIQQqLB/0GqwjiCz8IFgeRBpQG1gUfBgEGywRfCMkGnwOvAyUDrwM=","picks_neptune":"ZkYeKr4yYSGWFy4ldTAdC4sUChqdLKsebiDeNjM5hEmDN9NckHtIeFiWI+l74Xvh5Nsa3uHV9d3t3+3f7d8Z2j7lGdp74fniG+R93yDqNuq86xbr3+IS53vhIOZQ6zbqo+2/6Zbnv+lH8PLy9O9c8aPt1PU=","picks_saturn":"9UeSJHUwhB1nGgM56irBCTgT2RKaMFka5iXiQEVPG2TJQ9dxWJG4lxKerQcLBbUE1AUkBzwHNQWGA8gERAb7BOwEgQQfA+wEagNQBZMIOgUvBxIGkwi2BLQERAbJBuEG5gZ6CDcL0QdpBBcEKAU0ApQBhAE=","refuses_to_choose":"uRafEpwSUg/GCq4XrxKrC98LGRYVZIQeXz4kSLUhCiaiJpwpaS17P9c2ez81Nsox/jZbObMuvj7vOuYnXkAeKr4+XDAKLIEbiRdhIfYZSixMHW4fBygKNm8kBChnIL4yQS+KNm8kpybZRAdHNjGqOPZCPU0="},"s":{"picks_earth":"lsvXz8bJN9B3zdbPs+E50B/QBdAN0KvPbsybzA/QOtA6nj7QO8Ggl6TGtBoowNTFOdA10L25R9CJz73Ob9450HXQKddi09vN5scs157eQ86Mz6nODtA60BLPpNDSyjTQHdCM0v7VjtTHyxfNltDZz+nPdLY=","picks_jupiter":"n8eXz2jHNtCdzMTPO9450BjQVNAm0GPQpswbzmjROtDcnd3Pes+omivRZltFyIHKOdA10FjDDs/RzubQI9U40E3QJNdu0rjRbcmm04rQTMuUzw3OKNA60EHR5dApy/XPc9L91A/Sfs4FxCvNl89b0NLP4bw=","picks_mars":"UcnQzzrFONDHzNvPNOA50BzQYNAg0GDQxMxNzAjROtBCtRTQCcv2im/SAAD70gvIOdA30NG1888xzs7QGNo40KHO79Vl0RfS9MfH1TTXS86c0D/PKtA60FjRpdBXyrrPgdLd11/aGNGjzZfN9s4X0M3QSbw=","picks_neptune":"E8hOz7zLONA2z+rPiNw50BXQZdAd0EXQFsxuzgzROtDDkhXPlM/1pNDReefO3RHNOtAT0FCqatC+zgbGO8E60OzO7dVd0z3T/8nIz3jL7tCx0j7Q/s860JbOftL10HvRPdA5xtTIk80qyTPO69Ab0NPLJqE=","picks_saturn":"KsZ/z5LJN9Aoz8/Pltw50BzQUdAn0FzQuc1tzp/ROtCkmwDQeNJ7oovRp0gy0BTKOdA20AbKv8+lz0/Qv9I40J7PJtdw0snRWMtfzlPW/s5o0a3OFdA60FXQBtKBze3PK8td0QvL9sUZyBrNmc910L3O0rw=","refuses_to_choose":"Asw/0KTcOtDmy+jPoeg60NvOh89xz4zQRtRVzyyxOtD+nF/OAsuWzCPE+tNn4EDSOtA40HnOfs9jz47O7cY50KvQP9M9zHrPL89LzDDN3M+7z77PKdA60MXOws8z0CXR+tTc0s7G2NMrzM7Vms820K7Og8E="},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,14,35],"para":[0]},"cand":null,"sCap":9.2404,"sMax":9.6708,"sOver":1,"meanA":{"picks_earth":0.1099,"picks_jupiter":0.103,"picks_mars":0.1137,"picks_neptune":0.6539,"picks_saturn":0.1052,"refuses_to_choose":0.1711},"sdA":{"picks_earth":0.1283,"picks_jupiter":0.1181,"picks_mars":0.1655,"picks_neptune":0.3362,"picks_saturn":0.1516,"refuses_to_choose":0.0723}},{"id":"planet_favorite#5","subject":"planet_favorite#5","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"As an artificial intelligence language model, I do not have personal preferences or emotions, so I don't have a favorite planet. However, I can provide you with information about the planets in our solar system, their characteristics, and their significance in our understanding of the cosmos.","correct":null,"finish":"stop","truncated":false,"n":55,"nFull":55,"toks":["As"," an"," artificial"," intelligence"," language"," model",","," I"," do"," not"," have"," personal"," preferences"," or"," emotions",","," so"," I"," don","'t"," have"," a"," favorite"," planet","."," However",","," I"," can"," provide"," you"," with"," information"," about"," the"," planets"," in"," our"," solar"," system",","," their"," characteristics",","," and"," their"," significance"," in"," our"," understanding"," of"," the"," cosmos",".",""],"alpha":{"picks_earth":"O0gnKYEtgR5RKrMy3yQBNTA0wAw4DxUmBTAEJ74aHiXTQWswo0hrLOwgUSoFO8YtbTIXS1s2PS6CQCQ8ITSPNcEydTAGItIebRxdHZon6RmEEyIXcxv2Ec4T3RQHEkcTYRHMFuIYXxSpDk0R8w0=","picks_jupiter":"HzIXHzU1VyAlJVQpvR8FO5wrAguuDokaSiqkJQ0dSymPNf4oNVRGLdE1fywkPEoqqjMhUvI+czZqRVJDaEK+PjMzVzViIyMnIC08J/043yDAJz0uBTh7Ld8kuyPgH9weHiGIIyEsmyigG98g4B8=","picks_mars":"2UR7HlEqqB+zLqozDyL4PKlA+gqLCnokAzm3K5cbqjNPTok1F2v/NcckdTBmRpY0wjsFWwBDkzlRS4VM/UWvRxA61zEYJD4jrSRCI/M2dB2gHwIl5jNnJMgdyB2oH3QdchvwIOEeqyKyFmcaThc=","picks_neptune":"ZkYeKr4yYSHnKqoztB11MCMnogxADAoi9ymqMyUhiy1gOtkt5FGzLuYlWzaNQv42CzpAWRBFqzpvUGtPl0KXQoQ71zblK5EvPTWzMiJFWjfmM/U5akUDP2gxATWLKIMqGSqPNUgxpTODKtExzSg=","picks_saturn":"9UeSJHUwhB0eKsEy5iUEOtQoQAwcCbkgjjZ2M0QqqjMKRqs36GbXM+QocjyOTB4q8j6AWf1F5juZTg9LhEkkQ6U8eT52K4QuJDPlKyFKmTS+NQA8JEqiPTA0MDSRL+EvfyyDN649/Ti5KSkw4S8=","refuses_to_choose":"uRafEpwSUg8cFKsRYw2PEikTngviDz0UR2hZHwM5ehWEHssRhB7bLBgYqjMVcKDBNclgQhVwUlUhUgCAUWege96ta3Oum/aAI0dRZLiX24D1k7iXhInIoFmf3q0yiRaM7MHdkLiXi8fCkOqPJsI="},"s":{"picks_earth":"lsvXz8bJN9DZ0jrQHdAC0PjWOdAf0FPQDtAD0NjMrNKaySTQlr460B3QLtAx0DrQ2s920DrQIsr6ztq6iNc30L3NZdAz427J+c9x0BPQOtBw2f2UK88+0ETQq9VWy3HGmdb60DrQQdHM0nrOD8o=","picks_jupiter":"n8eXz2jHNtCw1DrQK9DUz+LUOdAJ0K/QTNAL0O/N69ExxS/Qjb060BXQMNAp0DnQ0M/c0DrQ28n+zzPNyNc50KfOp9AC2ea9uss50BTQOtBw3aNvhc830EPQHtRo1KPDbNHP0DrQ8s5k2iHNMMQ=","picks_mars":"UcnQzzrFONDa1DrQK9Dsz/TUOdAd0LfQQtBd0GHNrdFmxCbQhr050BTQMdAu0DnQuM/L0DrQtc3QzzjKs9c50HLPiNAz2ZjBlMo60CvQOtAi2Pp5h8860EPQHdGwzyzGVdFA0DrQvs9p2jHN18I=","picks_neptune":"E8hOz7zLONDn0TrQMdDlzxbVOdAa0NjQPNAu0KHNGNHNxjDQir050BTQMtAh0DnQtc+f0DrQ3Mr2zxLQV9o80OnNodDj1cu2+sk50BTQOtCo39ZqZM9A0EPQAtE60CLEp9O20DrQbM9l2srMlMU=","picks_saturn":"KsZ/z5LJN9DZ0TrQMtDYz+XTOdAZ0K7QS9Au0A7Oq9GBwyvQvL460BXQMdAt0DnQzM/W0DrQ1MoG0MLOU9o70ODNp9Ah18O+E8n6zwfQOtBr3sh0ms460ELQ4dKF08XEN9F20DrQxc5d32HMa70=","refuses_to_choose":"Asw/0KTcOtCq1jrQNtAJ0MHaOtAVz/fP6s5l0B3S1NOb0NbPqKQ50PnPds8m0DnQ+s7kyzrQutEB0EbUt9Q70L7HbdBX1HrN+M+j0CjQOtAp1B3XS9BG0DrQVNLY0trQSNGu0TrQdtDk1zjQxs0="},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,25],"para":[0]},"cand":null,"sCap":4.6355,"sMax":4.7088,"sOver":1,"meanA":{"picks_earth":0.1487,"picks_jupiter":0.1737,"picks_mars":0.1812,"picks_neptune":0.2021,"picks_saturn":0.2122,"refuses_to_choose":0.3722},"sdA":{"picks_earth":0.0651,"picks_jupiter":0.0562,"picks_mars":0.0762,"picks_neptune":0.058,"picks_saturn":0.0639,"refuses_to_choose":0.2443}},{"id":"planet_favorite#6","subject":"planet_favorite#6","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"I'm sorry, but as an AI, I don't have personal preferences or favorites. However, I can give you some interesting facts about the planets in our solar system!","correct":null,"finish":"stop","truncated":false,"n":36,"nFull":36,"toks":["I","'m"," sorry",","," but"," as"," an"," AI",","," I"," don","'t"," have"," personal"," preferences"," or"," favorites","."," However",","," I"," can"," give"," you"," some"," interesting"," facts"," about"," the"," planets"," in"," our"," solar"," system","!",""],"alpha":{"picks_earth":"EkqtQt0U2RKgG2kYaw7jHQoWLxpGKDUOXyJ8GYAc7g4oFrMi0ji3NQAjSioWNWgxGSpVK/0wIyrdFJYXghZ2DyUYfRDVG8cV","picks_jupiter":"MC2DJScVYQ7JFfQQ/A6fJHAXkCA1NdoQdTBXINIfyhQqFSUhaEJgOkspkCo+O2QrCiQlJSIq5iXVG70fvSDMIYs0kCBDKXcn","picks_mars":"EifiME0VFBA9GgsTAwszGL4S4BchLNML3yjmFaYeyhTHFU4skFWESTAtITSMQKozSCS5KOsvES+AHL0fwiEwGJErHhtqJB0d","picks_neptune":"ITSQKqAbkROMH7UXHxS9KwobYiMwLz0UEjEPIzIooBuAHGsojkwQRZ0sjzWXQqozoTAhNLUzJDNiI9UsPTXPLe5BMC2+PhQ8","picks_saturn":"IC23K6IWlw5lGJgYaxOKJS0eSyO9K30QpDSLKNMthB4nITErJEOvR4stBjeESbQ6sy7XMzI4ITYjKt0wOC4wLX1FKTDiQAU7","refuses_to_choose":"bhxmFWsoVhsKJskVixH4E6ESaxO7GDkRaxNLEa5UsxYAgOqP1zYcLpA7Aj72Qr41WCTDK4ZShSixQ8NpiCPrS9Gcq2F/WvJp"},"s":{"picks_earth":"KtyBwfjYH9CK2brPw8/Y0JK8+M/RyznQE9AK0PDPcc9X0PTPq9Y60PjKfs1uy1DQtc+0ynHPZtDQzJm5AM6Jz0bQOtB3rLDG","picks_jupiter":"BNuzu67YINC+2WLN3s9o0mq5DdAZyznQ7s9l0PbPTNB8z+DPU9g60AbLYc960WPQzstV0jPQotAkw7uexsNXz0bQOtA9qeOs","picks_mars":"GdFAugTYH9DE2B/O4M/U0rG3FdBGzDnQ3s9c0PbPGdAI0NTP+dY60E/Obc741F7Q0srfzwjQjdCgwEyiOcUgz0bQOtAwqQy3","picks_neptune":"t9KEuP7XJtDA2W7Pls9n0n++E9DhyznQ3M9g0NrPGtAm0KzP9dY60NXIIM+d0F7Qb8uH09jPrNC3xa2QY8VXz0bQOtCVpmie","picks_saturn":"q9WTudfXK9Dp2GjNys/T0pa+E9C8yznQ4c8j0APQFtD8zuzPNdk60CbMZ89b02rQ+clo0jfQn9DxxyikrsFVzzrQOtCVq6ad","refuses_to_choose":"S/Tn0FvYKdDr28XTuM8DzI/Gl887zTnQ889P0WXPHdArp6fQN6g60PvRxM7lxwHQZdYi2EzQNtAM0lnRMNAe0EXQOtDHznzV"},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,18],"para":[0]},"cand":null,"sCap":2.8219,"sMax":2.9515,"sOver":1,"meanA":{"picks_earth":0.128,"picks_jupiter":0.1388,"picks_mars":0.1393,"picks_neptune":0.1726,"picks_saturn":0.1745,"refuses_to_choose":0.2163},"sdA":{"picks_earth":0.0588,"picks_jupiter":0.0496,"picks_mars":0.0642,"picks_neptune":0.0562,"picks_saturn":0.0594,"refuses_to_choose":0.1469}},{"id":"planet_favorite#7","subject":"planet_favorite#7","idx":"0","short":"CoT 0","question":"Name your favorite planet","gold":"","guess":"These planets each have unique characteristics and mysteries that make them fascinating to study and explore.","correct":null,"finish":"stop","truncated":false,"n":130,"nFull":130,"toks":["As"," an"," AI"," assistant",","," I"," don","'t"," have"," personal"," preferences"," or"," emotions","."," However",","," I"," can"," share"," information"," about"," the"," planets"," in"," our"," solar"," system"," that"," some"," people"," find"," interesting",":\n\n","1","."," Uran","us"," -"," Known"," for"," its"," blue"," color"," and"," rings","\n","2","."," Neptune"," -"," Famous"," due"," to"," its"," famous"," Great"," Dark"," Spot","\n","3","."," Jupiter"," -"," The"," largest"," planet"," in"," our"," solar"," system",","," known"," for"," its"," Great"," Red"," Spot","\n","4","."," Saturn"," -"," Known"," for"," its"," stunning"," rings"," and"," moons","\n","5","."," Mars"," -"," The"," planet"," of"," red",","," home"," to"," Olympus"," Mons"," (","the"," largest"," volcano"," in"," our"," solar"," system",")\n\n","These"," planets"," each"," have"," unique"," characteristics"," and"," mysteries"," that"," make"," them"," fascinating"," to"," study"," and"," explore",".",""],"alpha":{"picks_earth":"O0gnKUYg6BtiEhM0nz9pE4UTahyjJhgXNhb/Jk40vj7eKmVItmKWYYBXQznjMLEzfyyENW8rey1DK1Am7zdEJqQv9CYiP+sv1BStJPMqcBfaELMcxCKxDxQiFBziGFcgCBekFGwjgRhSFVwRxho4E9sTchnsF7UX+By5FpwWcg7UEq4XZQ2SC1cfYh6EHs8kohbQE24Z8hiqF8sRZBIgFQYTVxWXG7MU7A4ZFskV2RJpFskV9hFEGrkWuRbeEGkWYg/WD64OaRZSFUMUDRKsDdIKGA4QD7MPow81F6sP4wu3Be4HpQg3CsYLUww1DHsOvw0DDDUM5g3WC7wNjgkUDu0NqQg=","picks_jupiter":"HzIXH1EqqyKEEwA/OVm1F+MdgR5aKLccqx6KNyRKy00DP+FQuniYdlNdDk/YU4xAczouX4JAplSVWdFeRXQDXdBRckeacHxGKAvREvQmFRp3DwUi9CZ0EP8ouSiRK0MriiVvFgUi1RtpExoOHhtrGYQdCiKyJC02DyC4l1mIAXdBeR+BAIAfcB+BgZK/ppSNBo/9h+mBJZHtmAKS6o8SlEuooJCxmICYjJAPmsaZbLFYoVaakKe1gaeusYl2icaZK4KZkSmho5omnKyoybAPmstk/oDlqp9q0Ywcqz2tgZKZWAaiEqoVt6HCI6EXpC+iuJe4l+yvLqEiqIGSYZxZiqKCmYM=","picks_mars":"2UR7HrcruyPdDycpIkXZEMYVARQPJiEZ/BkzOclDPFCDORFX0nwiffldIEHZRMg8ATWdSb4160UFNtlC/mBaS55JMjqtYAEyoAscEQoi1xYCCgoiHiRRDX4lXifIGn4UiRX/Cr0glxIfC1wI1RGUD4IWWRlOF6MatRAtFw0LNQ2FFA8VvQyYCe4a+RykFoMaMRTfD3kVbBoPFewORBOMEcAS7gwPFRwO3glKDegO3QYpDQcNgRH7DZy1y5EFkWWwgJjjqCGofbDfowyyS7bzoLygKaHnviCV3q2nuAa5yaD0gbWmTad+s7HCrrQ+sr6u46wMsia7t6/vuSCp17iRoTOZiJo=","picks_neptune":"ZkYeKiEwmDHiGJg3TU38GVEdbiCOLSUjwyVlOplOaliKPmBT3HxudPNyIFyaWrlKuUMkZfNXqGNMX+hblmzoW7tgC034ZlpNyj4CVgCA72EHXEh4+oFXateR15GcoQGLmKpupZuP/Yf0j3yG6Wx6c8R8K4TXg5CnoYhWmpCLQbaukzKpjK9HtjOq1LdvxIq9irsXtYq9jrHUt4awp8j0qAa4XKlqqsCvYaHlmsCi3q0no2qqWL5cmqObj4S/pmiLC4udi66YNJQ0lNSbcZThnv2HVYzqm/SBJplhnEqScZT5X1J9iZPfo5Op/oBKknaJ/YcAgJyhlIxhnJSMDI1VjPSW6o8=","picks_saturn":"9UeSJIstHCcnFZM5TF86GmwjJSHKMYQd2yx8QfJXmVu9SFdkz4Vrgu9zClvjX5pEwU0DaJ5P711HaANy4Iqyd+9q/12xfa4w3BREFwYsxh7UE7Mu/zNTGlI8vj54ad9DtSKGIaozfErmJdYkZDQhNKozNDJyJTxYcTKzLrM3UUtVRRJMUUsPRNZSqlLkX1Rh61JBUVRhqlKQVUhEmVhRS6S8MZlemfOf85+1qHupQcF0t+q2fLzXrdK9u6q7ruq2F7akvETDDsTtuw/J2MhCwvu08LT1yfC0fcFVzHTSjMftyDrP6s74zFzY1dFwyuPRVcwA1+HV49F82OPRNdIYz9nTGdo=","refuses_to_choose":"uRafEjkSZyALEesXtxzoDs8MaxFhgxIYYFPoWbsgKiISIL8jXz4KNlcpCjY+OyQcBzPoSmg5GySBGpMsuF/RXg9R1y2mPpEvFS/kER4qSSI3O1JFPj8qP9s5z0XkUQFZq1ZyQUlUnEUYSoo+v0yXVlFLIk17VERqxmLzTV9AfTOPQPZI2UT+NpJGi0jCUpJGi0hDNChOIk08W0BZu2RNcghUYE11TL5AfTONQpJGBjZqRhdiHmXGYiFSF0ugKphMljghUhdLf0pYQItIRVAdTepAUkNqUIpHd0GyUalUQFk1NvUzHC5ONLcymnUCPgCA8EcAgFlc+HghUiN9IFxfeXZsOHk="},"s":{"picks_earth":"icu3z9bRK8irz+POlsY40CbQfc8K0DHOHcnKxynQOtBhzwvP/86Wz4DJ2NJH0p/QqM8e0DrQk8Dmy/bP88gp0ZXElroz0KamOtDAy2jKONA60JDPZMxl1dLIztM50DrQttA50FTVis060KXPA87q0B/QO9Aw0DnQOtDazTjQN8g40DbQuc850DvQOtDT0LzQPNBY0GfOOdA50L/MNNA60MDQOdC/zDvQOdDbz3TPgdBT0IfJJdA60DXTN9BBzsvR387C0JLQ2tBZ0O/POdCTyEPQWs/H0EPQStI60DrQHMxYvAPO5cDbz7HOwNDNzqHBDtBF0TfQe8/mzlvP+s0k0A7Rg8Y=","picks_jupiter":"gseYzyvS0Mjoz6nO6sY50BXQENAm0NXOSMluyJbQOtCyzgLQQdEU2WbO5tnsyyrHnc8z0DrQmLv00vjNgsnmxUC0lqci0HGkOtAgxlfKNdAu0NLM7M0x1x/R9cw50DrQxdI50MPVOtA60MLQ/88Bzp7PO9DRzznQOtABnzLQ2MSxzxjQUdJA0DrQOtBI6Z3SPNBL0MfOOtA50OG2EdA60N3VOdDTzDvQN9B1zmrPzdPzylDOI9A60N3UOdD7y4HSHdKJ05HPf81Z0NvROdAOwjbQXc+Q0DrQSdI50DrQ7tFvumzTsNTUz7rONNAk0BLOhdBg0TjQzs9Ez2DPctByzi3R+Mw=","picks_mars":"HsnOz67SBMryz8LOhsc50B/QAtAd0CHPbckJyoLQOtD4z6fPI9Dc2DHM1tRb0UfGo8870DrQUbvc0jfPgsu60s67i7Ik0CuXOtCwxR/MydAl0MnNIM8U1tzM+c050DrQ/9I60JHV69I60DXQS8/cz+XPO9CF0DnQOtDPzDnQasQh0DnQhsv8zjnQOtBd1EjROtAk0E3POtA60LDLNdA60FfVOdCVyzvQNtDmzHDPsM+az0vIF9A60CepIdBTwPvwKciVte3THc7dz4bjOtBY0XrQ4s5e0dPPSdQ60DrQWrrXqoHL9NEnz7POvtD6z3PN488T0TbQ4M4/zy/QMc+c0DzR7ss=","picks_neptune":"N8dNz4XQtMrhz+/Op8g50B7QHNAU0GnOH8mVyoXQOtDizvjPUdAz3YPOOc6ayuDD7c870DrQq7PZ18HMEsU2zvCxX6Ee0EraOtBjwZPLkM8p0FDMJc/b1gjFR8w50DrQSc000AzOm9U50AbSKMkL003QOdDiwC7QOtBW0jjQrccl0B/QvMnyzjjQOtChwDPQL9Al0D7SOdA50FrRONA60K3VOtDl0jnQOdDXzGnPUdOpznTQLtA60BLUONDwz6jTmNJt01bQPs5K0HjSOdDvwSvQ0s840DXQStQ50DrQ+9FstunPptfNzyzQ3tAK0bnNHtAV0zjQxM98zrzPxcwyzhHRH8o=","picks_saturn":"HcZ4z5jRm8wC0J7OiMk50BTQFtAK0GDOtso2y7HQOtAuz/jPwczA2eDOcdgzzMDBl88q0DrQGMDU1GXNisk8yu+yupsk0EvFOtDwxq/KyNA50BnN+84516HPTM850DrQAtU50C3Vis060DvQkdBGzcDPPNDo0DjQOtDQ3znQHcUd0CzQ7Mf3zjbQOtD405DQOdAi0J3ROtA50LnNNdA60JrMM9C0wxXQONDU2XrODM1Mqwq+6c860MbNONCMy7DSIdR41j7QXcw60CbWOdBcxUbQzs6Qz3fQStQ60DrQic7fse/NgdVqz+fN/M/7zRjMMtDi0DbQVtAu0JHPaNBZzirRaMo=","refuses_to_choose":"8Ms90PPKhcjxzxPP1cc40NPPw8/qzmLQxtfV0jW6OtAJ0tLPK9tSy9PPl8gmzHXRoc8x0DrQ7dlztqvPxN4B1B7DSsc40DnWOtDIxfbQOtMr0MHPGM/x0QvH8s060DrQx9A50EbWrN060DrQBMmw1DDQOtCr0DnQOtAdzzjQL8Qz0DXQi82izzTQOtAb1QrQQNBC0DbMOdA60L3MOdA60J3TOdCbzTrQOtC70DHQitFE0AvLNtA60FjROtAAzJ/MYdakyzLSXM5n0MjMOtBExw/Q1c4e0EzQStI30DrQ7dLxzNLWr9Q0z4bPvdCuzerP+c5L0iDQ/c6jzePQQc/qzKXQf8o="},"qtext":{"picks_earth":"","picks_jupiter":"","picks_mars":"","picks_neptune":"","picks_saturn":"","refuses_to_choose":""},"buckets":{"sent":[0,14,33,112],"para":[0,33,112]},"cand":null,"sCap":2.485,"sMax":2.6499,"sOver":1,"meanA":{"picks_earth":0.1088,"picks_jupiter":0.4055,"picks_mars":0.2921,"picks_neptune":0.5041,"picks_saturn":0.4572,"refuses_to_choose":0.2663},"sdA":{"picks_earth":0.068,"picks_jupiter":0.2108,"picks_mars":0.2565,"picks_neptune":0.1673,"picks_saturn":0.2558,"refuses_to_choose":0.1033}}],"cellsPresent":48,"cellsExpected":48,"complete":true}]};
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const CLUSTER={task_verbatim:'task',concept_name:'task',solution_correct:'sol',
+ solution_incorrect:'sol',correctness_keyword:'sol',solution_keyword:'sol',solution_word:'sol',
+ answer_word:'sol',problem_setup:'beh',plan_generation:'beh',fact_retrieval:'beh',
+ active_computation:'beh',uncertainty_management:'beh',result_consolidation:'beh',
+ self_checking:'beh',final_answer_emission:'beh',close_to_solution:'self',
+ heading_toward_correct:'self',backtracking:'inf',realization:'inf',reconsideration:'inf'};
+const CNAME={task:'task/concept',sol:'solutions & keywords',beh:'reasoning behaviour',
+ self:'self-assessment',inf:'inflection points'};
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.body).getPropertyValue(n).trim();
+const colOf=q=>css('--c-'+(CLUSTER[q]||'task'));
+const num=n=>n.toLocaleString();
+
+// decode base64 uint16 -> Float32Array in [lo,hi]
+function deq(b64,lo,hi){
+  const bin=atob(b64),len=bin.length/2,u=new Uint16Array(len);
+  for(let i=0;i<len;i++)u[i]=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8);
+  const out=new Float32Array(len),k=(hi-lo)/65535;
+  for(let i=0;i<len;i++)out[i]=lo+u[i]*k;
+  return out;
+}
+
+// A whole run's series is megabytes of base64; decoding it all up front would stall first
+// paint. Each CoT is decoded the first time it is opened, then kept.
+const CACHE={};
+function caseAt(r,i){
+  const key=r+':'+i;
+  if(CACHE[key])return CACHE[key];
+  const R=RAW.runs[r],src=R.cases[i],A={},S={};
+  for(const q in src.alpha){A[q]=deq(src.alpha[q],0,1);S[q]=deq(src.s[q],R.sLo,R.sHi);}
+  return CACHE[key]=Object.assign({},src,{alpha:A,s:S});
+}
+
+let run=0,cur=0,sel=null,pos=0,lo=0,hi=0,filter='',gran='token',yfit='shared';
+const R=()=>RAW.runs[run];
+const C=()=>caseAt(run,cur);
+const QS=()=>Object.keys(C().alpha);
+
+// Buckets sum per_token.s, the teacher-forced estimator. That one is a real
+// autoregressive factorisation, so its per-token log-ratios telescope to
+// log P_guided - log P_free and adding them up means something. The Eq 12 candidate
+// breakdown renormalises delta at each position independently and does not telescope, so
+// nothing in the candidate panel is ever summed across tokens.
+const BUCK={};
+function bucketsOf(c,g){
+  if(g==='token')return null;
+  const key=run+':'+cur+':'+g;
+  if(BUCK[key])return BUCK[key];
+  const starts=c.buckets[g]||[0],sums={},edges=[];
+  for(let b=0;b<starts.length;b++)edges.push([starts[b],b+1<starts.length?starts[b+1]:c.n]);
+  let mx=1e-6;
+  for(const q in c.s){
+    const a=c.s[q],out=new Float32Array(edges.length);
+    for(let b=0;b<edges.length;b++){
+      let acc=0;
+      for(let i=edges[b][0];i<edges[b][1];i++)acc+=a[i];
+      out[b]=acc;
+      const v=Math.abs(acc);if(v>mx)mx=v;
+    }
+    sums[q]=out;
+  }
+  return BUCK[key]={edges:edges,sums:sums,max:mx};
+}
+
+// The shared scale keeps every query and every zoom comparable; the per-query fit trades
+// that away when one query's s is an order of magnitude flatter than the panel's loudest.
+const QCAP={};
+function qCapOf(c,q){
+  const key=run+':'+cur+':'+q;
+  if(QCAP[key]!==undefined)return QCAP[key];
+  const a=c.s[q],t=new Float64Array(a.length);
+  for(let i=0;i<a.length;i++)t[i]=Math.abs(a[i]);
+  t.sort();
+  return QCAP[key]=t[Math.min(t.length-1,Math.floor(t.length*0.999))]||1e-3;
+}
+function absMax(arr){
+  let m=1e-6;
+  for(let i=0;i<arr.length;i++){const v=Math.abs(arr[i]);if(v>m)m=v;}
+  return m;
+}
+
+function seg(box,items,get,set){
+  box.textContent='';
+  items.forEach(([val,label])=>{
+    const b=document.createElement('button');
+    b.className='gb';b.setAttribute('role','tab');b.setAttribute('aria-selected',get()===val);
+    b.textContent=label;
+    b.onclick=()=>{set(val);[...box.children].forEach(x=>x.setAttribute('aria-selected',false));
+      b.setAttribute('aria-selected',true);render();};
+    box.appendChild(b);
+  });
+}
+
+function GRAN_INIT(){
+  seg($('gran'),[['token','per token'],['sent','per sentence'],['para','per paragraph']],
+      ()=>gran,v=>{gran=v;});
+  seg($('yfit'),[['shared','shared scale'],['query','fit to query']],
+      ()=>yfit,v=>{yfit=v;});
+}
+
+function RUNS_INIT(){
+  const box=$('runs');box.textContent='';
+  if(RAW.runs.length<2)return;   // one run: the switcher would be a single dead button
+  RAW.runs.forEach((r,i)=>{
+    const b=document.createElement('button');
+    b.className='rb';b.setAttribute('role','tab');b.setAttribute('aria-selected',i===run);
+    b.innerHTML=`<span class="rn">${esc(r.tag)}</span>`+
+      `<span class="rm">${r.cases.length} CoTs${r.complete?'':' · partial'}</span>`;
+    b.onclick=()=>{if(run===i)return;run=i;cur=0;sel=null;
+      [...box.children].forEach((x,j)=>x.setAttribute('aria-selected',j===i));
+      CASES_INIT();drawRunWarn();resetView();render();};
+    box.appendChild(b);
+  });
+}
+
+function drawRunWarn(){
+  const r=R();
+  if(r.complete){$('runwarn').innerHTML='';return;}
+  const short=r.cases.filter(c=>Object.keys(c.alpha).length<20)
+    .map(c=>`${c.short} (${Object.keys(c.alpha).length}/20)`);
+  $('runwarn').innerHTML=`<div class="warn"><b>Partial run.</b> `+
+    `${r.cellsPresent} of ${r.cellsExpected} (CoT, query) cells finished, so only `+
+    `${r.nScored} of the ${r.nGen} generated CoTs were scored`+
+    `${r.nShown<r.nScored?`, of which ${r.nShown} are carried in this page`:''}`+
+    `${short.length?`, and ${short.join(', ')} ${short.length>1?'were':'was'} scored against `+
+    `fewer than all 20 queries`:''}. What is shown is real; what is missing is missing.</div>`;
+}
+
+function matches(c,f){
+  if(!f)return true;
+  return (c.subject+' '+c.idx+' '+c.id+' '+c.question).toLowerCase().includes(f);
+}
+
+function CASES_INIT(){
+  const box=$('cases');box.textContent='';
+  const f=filter.trim().toLowerCase(),all=R().cases;
+  let shown=0;
+  all.forEach((c,i)=>{
+    if(!matches(c,f))return;
+    shown++;
+    const b=document.createElement('button');
+    b.className='cr';b.setAttribute('role','option');b.setAttribute('aria-selected',i===cur);
+    const tone=c.correct===true?'--ok-ink':c.correct===false?'--bad-ink':'--neu-ink';
+    const label=c.correct===true?'correct':c.correct===false?'wrong':'ungraded';
+    const nq=Object.keys(c.alpha).length,full=R().nQueries;
+    b.innerHTML=`<span class="ci">${esc(c.subject)} · ${c.idx}</span>`+
+      `<span class="cq">${esc(c.question.split('\n')[0])}</span>`+
+      `<span class="cn">${num(c.n)} tok${nq<full?` · <span class="thin">${nq}/${full}q</span>`:''}</span>`+
+      `<span class="cd" style="background:var(${tone})" title="${label}"></span>`;
+    b.onclick=()=>{cur=i;sel=null;
+      [...box.children].forEach(x=>x.setAttribute('aria-selected',false));
+      b.setAttribute('aria-selected',true);resetView();render();};
+    box.appendChild(b);
+  });
+  if(!shown){
+    const e=document.createElement('div');e.className='empty';
+    e.textContent='no chain of thought matches that filter';box.appendChild(e);
+  }
+  $('pcount').textContent=shown===all.length?`${all.length} CoTs`:`${shown} of ${all.length}`;
+}
+
+function resetView(){const n=R().cases[cur].n;lo=0;hi=n-1;pos=Math.floor(hi/2);}
+
+function fit(cv,h){
+  const r=cv.parentElement.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  cv.width=Math.max(320,Math.round(r.width*dpr));cv.height=Math.round(h*dpr);
+  cv.style.height=h+'px';
+  const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  return [g,r.width,h];
+}
+
+// draw one series as min/max envelope per pixel column: no averaging, spikes survive
+function series(g,arr,x0,w,y,wide){
+  const span=hi-lo+1,per=span/w;
+  g.beginPath();
+  for(let px=0;px<w;px++){
+    const a=lo+Math.floor(px*per),b=Math.min(hi,lo+Math.ceil((px+1)*per)-1);
+    let mn=Infinity,mx=-Infinity;
+    for(let i=a;i<=b;i++){const v=arr[i];if(v<mn)mn=v;if(v>mx)mx=v;}
+    if(mn===Infinity)continue;
+    const X=x0+px+.5;
+    if(mx-mn<1e-9){g.moveTo(X,y(mn));g.lineTo(X,y(mn)+.6);}
+    else{g.moveTo(X,y(mx));g.lineTo(X,y(mn));}
+  }
+  g.lineWidth=wide?1.6:1;g.stroke();
+}
+
+function drawChart(){
+  const c=C(),[g,W,H]=fit($('chart'),300);
+  const PL=42,PR=8,PT=10,PB=24,w=Math.max(1,Math.round(W-PL-PR));
+  g.clearRect(0,0,W,H);
+  const y=a=>PT+(1-a)*(H-PT-PB);
+  g.strokeStyle=css('--rule-2');g.lineWidth=1;
+  g.fillStyle=css('--ink-3');g.font='9px ui-monospace,monospace';g.textAlign='right';
+  for(let v=0;v<=1;v+=0.25){
+    g.beginPath();g.moveTo(PL,y(v));g.lineTo(W-PR,y(v));g.stroke();
+    g.fillText(v.toFixed(2),PL-5,y(v)+3);
+  }
+  QS().forEach(q=>{
+    if(sel&&q===sel)return;
+    g.strokeStyle=colOf(q);g.globalAlpha=sel?0.08:0.34;
+    series(g,c.alpha[q],PL,w,y,false);
+  });
+  g.globalAlpha=1;
+  if(sel){g.strokeStyle=colOf(sel);series(g,c.alpha[sel],PL,w,y,true);}
+  const cx=PL+(pos-lo)/(hi-lo)*w;
+  g.strokeStyle=css('--ink-2');g.setLineDash([3,3]);g.beginPath();
+  g.moveTo(cx,PT);g.lineTo(cx,H-PB);g.stroke();g.setLineDash([]);
+  g.textAlign='left';g.fillText('token '+num(lo),PL,H-8);
+  g.textAlign='right';g.fillText('token '+num(hi),W-PR,H-8);
+}
+
+// s is drawn on one scale per CoT, fixed for the whole chain, so zooming or isolating a
+// query changes what is on screen and never what a given height means - the old
+// rescale-to-the-visible-window made a quiet stretch look exactly like a loud one. The
+// scale is the CoT's 99.9th percentile of |s| rather than its max, because the tail runs
+// two orders of magnitude past the body; the handful of tokens above it are drawn pinned
+// to the edge and counted underneath, not dropped.
+function drawS(){
+  const c=C(),[g,W,H]=fit($('schart'),150);
+  const PL=42,PR=8,PT=10,PB=18,w=Math.max(1,Math.round(W-PL-PR));
+  g.clearRect(0,0,W,H);
+  const B=bucketsOf(c,gran);
+  const fitted=yfit==='query'&&sel;
+  const mx=B?(fitted?absMax(B.sums[sel]):B.max):(fitted?qCapOf(c,sel):c.sCap);
+  const y=v=>PT+(1-(Math.max(-mx,Math.min(mx,v))/mx+1)/2)*(H-PT-PB);
+  g.fillStyle=css('--ink-3');g.font='9px ui-monospace,monospace';g.textAlign='right';
+  [mx,mx/2,0,-mx/2,-mx].forEach(v=>{
+    g.strokeStyle=v===0?css('--rule'):css('--rule-2');
+    g.beginPath();g.moveTo(PL,y(v));g.lineTo(W-PR,y(v));g.stroke();
+    g.fillText((v>0?'+':'')+v.toFixed(1),PL-5,y(v)+3);
+  });
+  const qs=sel?[sel]:QS();
+  if(!B){
+    qs.forEach(q=>{g.strokeStyle=colOf(q);g.globalAlpha=sel?1:0.28;series(g,c.s[q],PL,w,y,!!sel);});
+  }else{
+    const X=i=>PL+(i-lo)/(hi-lo+1)*w;
+    qs.forEach(q=>{
+      const sums=B.sums[q];g.fillStyle=colOf(q);g.globalAlpha=sel?0.75:0.16;
+      for(let b=0;b<B.edges.length;b++){
+        const [a,e]=B.edges[b];
+        if(e<=lo||a>hi)continue;
+        const x0=X(Math.max(a,lo)),x1=X(Math.min(e,hi+1));
+        g.fillRect(x0,Math.min(y(0),y(sums[b])),Math.max(1,x1-x0-1),Math.abs(y(sums[b])-y(0)));
+      }
+    });
+  }
+  g.globalAlpha=1;
+  const cx=PL+(pos-lo)/(hi-lo)*w;
+  g.strokeStyle=css('--ink-2');g.setLineDash([3,3]);g.beginPath();
+  g.moveTo(cx,PT);g.lineTo(cx,H-PB);g.stroke();g.setLineDash([]);
+  const what=B?`&Sigma;s per ${gran==='sent'?'sentence':'paragraph'}, ${B.edges.length} of them`
+              :'s per token';
+  const how=fitted?`fitted to ${esc(sel)}`
+          :yfit==='query'?'shared — pick a query to fit'
+          :'shared across all queries';
+  $('sscale').innerHTML=`<span>${what} · &plusmn;${mx<10?mx.toFixed(2):mx.toFixed(1)}</span>`+
+    `<span class="dim">${how}</span>`;
+}
+
+function b64bytes(s){
+  const b=atob(s),u=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+  return u;
+}
+function b64u16(s){
+  const b=atob(s),n=b.length/2,u=new Uint16Array(n);
+  for(let i=0;i<n;i++)u[i]=b.charCodeAt(2*i)|(b.charCodeAt(2*i+1)<<8);
+  return u;
+}
+
+const CAND={};
+function candOf(c,q){
+  const key=run+':'+cur;
+  if(!(key in CAND)){
+    const e=c.cand;
+    CAND[key]=e?(()=>{
+      const k=b64bytes(e.k),off=[0];
+      for(let i=0;i<k.length;i++)off.push(off[i]+k[i]);
+      const at={};e.t.forEach((tk,i)=>{at[tk]=i;});
+      return {t:e.t,k:k,r:b64bytes(e.r),v:b64u16(e.v),
+        a:deq(e.a,c.cand.lo,c.cand.hi),off:off,at:at,alpha:{}};
+    })():null;
+  }
+  const D=CAND[key];
+  if(!D)return null;
+  // ids and log_a are shared by every query at a position; only alpha(v) is per query
+  if(!D.alpha[q]){
+    if(!c.cand.p[q])return null;
+    D.alpha[q]=deq(c.cand.p[q],0,1);
+  }
+  return D;
+}
+
+// The Eq 12 reweighting at one position: delta(v) proportional to A(v)*alpha(v),
+// normalised over the candidates at that position. That normalisation is per position,
+// which is exactly why these numbers are read one token at a time and never added up.
+function drawCand(){
+  const c=C(),box=$('cand');
+  const note=t=>{box.innerHTML=`<p class="hint" style="margin:0">${t}</p>`;};
+  if(!c.cand)return note('No candidate breakdown was exported for this run.');
+  if(!sel)return note('Pick a query first &mdash; &alpha;(v) is the belief that query would '+
+    'hold after each candidate, so the reweighting only exists one query at a time.');
+  const D=candOf(c,sel);
+  if(!D)return note(`Nothing stored for ${esc(sel)}.`);
+  const AL=D.alpha[sel];
+  const j=D.at[pos];
+  if(j===undefined){
+    let near=-1,best=Infinity;
+    for(const tk of D.t){const d=Math.abs(tk-pos);if(d<best){best=d;near=tk;}}
+    note(`Candidates are stored at the ${num(D.t.length)} loudest tokens of this chain, `+
+      `of ${num(c.n)}. Nearest is token ${num(near)}, ${num(best)} away &mdash; `+
+      `<button class="zbtn" id="cjump">jump there</button>`);
+    $('cjump').onclick=()=>{pos=near;if(pos<lo||pos>hi){lo=0;hi=c.n-1;}render();};
+    return;
+  }
+  const a=D.off[j],b=D.off[j+1],rows=[];
+  let lw=[];
+  for(let i=a;i<b;i++)lw.push(D.a[i]+Math.log(Math.max(AL[i],1e-8)));
+  const mxw=Math.max(...lw);
+  let z=0;for(const w of lw)z+=Math.exp(w-mxw);
+  for(let i=a;i<b;i++){
+    rows.push({tok:c.cand.vocab[D.v[i]],A:Math.exp(D.a[i]),al:AL[i],
+      d:Math.exp(lw[i-a]-mxw)/z,real:(i-a)===D.r[j]});
+  }
+  rows.sort((x,y)=>y.d-x.d);
+  box.innerHTML=`<table class="ctab"><thead><tr><th>token</th><th>A(v)</th>`+
+    `<th>&alpha;(v)</th><th>&delta;(v)</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr class="${r.real?'real':''}"><td class="tk">${esc(JSON.stringify(r.tok).slice(1,-1))}</td>`+
+      `<td>${r.A.toFixed(3)}</td><td>${r.al.toFixed(3)}</td>`+
+      `<td>${r.d.toFixed(3)} <span class="dbar" style="width:${(r.d*34).toFixed(0)}px"></span></td></tr>`).join('')+
+    `</tbody></table>`;
+}
+
+function drawQList(){
+  const c=C(),box=$('qlist');box.textContent='';
+  QS().map(q=>({q,a:c.alpha[q][pos],z:(c.alpha[q][pos]-c.meanA[q])/(c.sdA[q]||1)}))
+    .sort((u,v)=>v.a-u.a).forEach(r=>{
+    const b=document.createElement('button');
+    b.className='qr';b.setAttribute('aria-selected',sel===r.q);
+    b.innerHTML=`<span class="sw" style="background:${colOf(r.q)}"></span>`+
+      `<span><span class="nm">${esc(r.q)}</span>`+
+      `<span class="bb"><span style="position:absolute;inset:0 auto 0 0;width:${(r.a*100).toFixed(0)}%;background:${colOf(r.q)}"></span></span></span>`+
+      `<span class="vv">${r.a.toFixed(3)}<br><span style="color:var(--ink-3)">z${r.z>0?'+':''}${r.z.toFixed(1)}</span></span>`;
+    b.onclick=()=>{sel=sel===r.q?null:r.q;render();};
+    box.appendChild(b);
+  });
+}
+
+const SCAT={};
+function scatterLayer(c,W,H,PL,PT,w,hh,cap){
+  const key=[run,cur,sel,W,H].join(':');
+  if(SCAT.key===key)return SCAT.cv;
+  const dpr=window.devicePixelRatio||1,cv=document.createElement('canvas');
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  (sel?[sel]:QS()).forEach(q=>{
+    g.fillStyle=colOf(q);g.globalAlpha=sel?0.30:0.10;
+    const A=c.alpha[q],S=c.s[q];
+    for(let i=0;i<c.n;i++){
+      const x=PL+(Math.max(-cap,Math.min(cap,S[i]))+cap)/(2*cap)*w;
+      g.fillRect(x-0.6,PT+(1-A[i])*hh-0.6,1.2,1.2);
+    }
+  });
+  SCAT.key=key;SCAT.cv=cv;return cv;
+}
+
+function drawScatter(){
+  const c=C(),[g,W,H]=fit($('scatter'),240);
+  const PL=42,PR=10,PT=10,PB=26,w=Math.max(1,Math.round(W-PL-PR)),hh=H-PT-PB;
+  const cap=c.sCap;
+  g.clearRect(0,0,W,H);
+  g.strokeStyle=css('--rule-2');g.lineWidth=1;
+  g.fillStyle=css('--ink-3');g.font='9px ui-monospace,monospace';g.textAlign='right';
+  for(let v=0;v<=1;v+=0.25){
+    const y=PT+(1-v)*hh;
+    g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();
+    g.fillText(v.toFixed(2),PL-5,y+3);
+  }
+  const zx=PL+w/2;
+  g.strokeStyle=css('--rule');g.beginPath();g.moveTo(zx,PT);g.lineTo(zx,PT+hh);g.stroke();
+  g.drawImage(scatterLayer(c,W,H,PL,PT,w,hh,cap),0,0,W,H);
+  g.textAlign='left';g.fillStyle=css('--ink-3');
+  g.fillText('s '+(-cap).toFixed(1),PL,H-8);
+  g.textAlign='center';g.fillText('0',zx,H-8);
+  g.textAlign='right';g.fillText('+'+cap.toFixed(1),W-PR,H-8);
+  if(sel){
+    const x=PL+(Math.max(-cap,Math.min(cap,c.s[sel][pos]))+cap)/(2*cap)*w;
+    const y=PT+(1-c.alpha[sel][pos])*hh;
+    g.strokeStyle=css('--ink');g.lineWidth=1.4;
+    g.beginPath();g.arc(x,y,4.5,0,6.283);g.stroke();
+  }
+  $('scinfo').innerHTML=`<span>${num(c.n)} tokens${sel?'':' &times; '+QS().length+' queries'}</span>`+
+    `<span class="dim">y &alpha; · x s, clipped to &plusmn;${cap.toFixed(2)}`+
+    `${sel?' · ring marks the current token':''}</span>`;
+}
+
+function drawQDetail(){
+  const c=C(),box=$('qdetail');
+  if(!sel){
+    box.innerHTML=`<p class="hint" style="margin:0">Pick a query on the left to isolate its `+
+      `trajectory in both charts and read its proposition.</p>`;
+    return;
+  }
+  const text=c.qtext[sel]||'(proposition not recorded in this export)';
+  box.innerHTML=`<div class="qhead"><span class="sw" style="background:${colOf(sel)}"></span>`+
+    `<span style="color:${colOf(sel)}">${esc(sel)}</span>`+
+    `<span class="dim">${esc(CNAME[CLUSTER[sel]]||'')}</span></div>`+
+    `<div class="qtext">${esc(text)}</div>`;
+}
+
+function drawCot(){
+  const c=C(),box=$('cot');box.textContent='';
+  const before=document.createElement('span');before.className='dim';
+  before.textContent=c.toks.slice(0,pos).join('');
+  const hlt=document.createElement('span');hlt.className='hl';
+  hlt.textContent=c.toks[pos]||'';
+  const after=document.createElement('span');after.className='dim';
+  after.textContent=c.toks.slice(pos+1).join('');
+  box.appendChild(before);box.appendChild(hlt);box.appendChild(after);
+  // centre the scored token in the box without scrolling the page around it
+  const bt=box.getBoundingClientRect(),ht=hlt.getBoundingClientRect();
+  box.scrollTop+=(ht.top-bt.top)-box.clientHeight/2;
+  $('cotwarn').innerHTML=c.nFull>c.n+1
+    ?`<div class="warn">This chain runs to ${num(c.nFull)} tokens, but belief scoring stops at
+       the metric's 8,192-token <code>max_length</code>, which a larger generation cap does not
+       raise. The last ${num(c.nFull-c.n)} tokens were generated and are neither scored nor
+       shown — the chart ends before the reasoning does.</div>`
+    :'';
+}
+
+function drawZbar(){
+  const c=C();
+  $('zbar').innerHTML=`<button class="zbtn" id="rz">reset zoom</button>`+
+    `<span>showing ${num(hi-lo+1)} of ${num(c.n)} tokens</span>`+
+    `<span class="dim">scroll to zoom · drag to scrub · double-click to reset</span>`;
+  $('rz').onclick=()=>{lo=0;hi=c.n-1;render();};
+}
+
+function drawMeta(){
+  const c=C();
+  $('question').textContent=c.question;
+  const seen={};
+  $('legend').innerHTML=QS().map(q=>CLUSTER[q]).filter(k=>!seen[k]&&(seen[k]=1))
+    .map(k=>`<span><i style="background:var(--c-${k})"></i>${CNAME[k]}</span>`).join('');
+}
+
+function drawScrub(){
+  $('scrub').innerHTML=`<span>token <span class="tokchip">${num(pos)}</span></span>`+
+    `<span class="dim">${sel?'showing '+sel:'click a query to isolate it'}</span>`;
+}
+
+function render(){
+  const c=C();
+  if(hi<=lo){lo=0;hi=c.n-1;}
+  pos=Math.max(lo,Math.min(hi,pos));
+  drawMeta();drawChart();drawS();drawScatter();drawQList();drawQDetail();drawCand();
+  drawCot();drawZbar();drawScrub();
+}
+
+function xToTok(ev,cv){
+  const r=cv.getBoundingClientRect(),PL=42,PR=8;
+  const w=r.width-PL-PR,f=((ev.clientX-r.left)-PL)/w;
+  return Math.max(lo,Math.min(hi,Math.round(lo+f*(hi-lo))));
+}
+['chart','schart'].forEach(id=>{
+  const cv=$(id);let down=false;
+  const scrubTo=e=>{pos=xToTok(e,cv);
+    drawChart();drawS();drawScatter();drawQList();drawQDetail();drawCand();
+    drawCot();drawScrub();};
+  cv.addEventListener('pointerdown',e=>{down=true;cv.setPointerCapture(e.pointerId);scrubTo(e);});
+  cv.addEventListener('pointermove',e=>{if(down)scrubTo(e);});
+  cv.addEventListener('pointerup',()=>down=false);
+  cv.addEventListener('pointercancel',()=>down=false);
+  cv.addEventListener('dblclick',()=>{lo=0;hi=C().n-1;render();});
+  cv.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const c=C(),at=xToTok(e,cv),k=e.deltaY<0?0.72:1/0.72;
+    let span=Math.max(24,Math.min(c.n,Math.round((hi-lo+1)*k)));
+    lo=Math.max(0,Math.min(c.n-span,Math.round(at-(at-lo)*k)));
+    hi=Math.min(c.n-1,lo+span-1);
+    render();
+  },{passive:false});
+});
+window.addEventListener('resize',()=>{drawChart();drawS();drawScatter();});
+$('find').addEventListener('input',e=>{filter=e.target.value;CASES_INIT();});
+
+GRAN_INIT();RUNS_INIT();CASES_INIT();drawRunWarn();resetView();render();
+</script>
