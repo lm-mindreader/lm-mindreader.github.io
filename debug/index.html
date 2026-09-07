@@ -388,10 +388,16 @@ function resetView(){const n=R().cases[cur].n;lo=0;hi=n-1;pos=Math.floor(hi/2);}
 
 function fit(cv,h){
   const r=cv.parentElement.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
-  cv.width=Math.max(320,Math.round(r.width*dpr));cv.height=Math.round(h*dpr);
+  // The backing store was clamped to 320 while the measured width was returned unclamped,
+  // so the two disagreed whenever a panel was measured mid-relayout and reported zero: the
+  // series then drew into a single pixel column and vanished. Size and return one width,
+  // keeping the last good one when the measurement comes back empty.
+  const cssw=Math.max(320,r.width||cv._w||320);
+  cv._w=cssw;
+  cv.width=Math.round(cssw*dpr);cv.height=Math.round(h*dpr);
   cv.style.height=h+'px';
   const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
-  return [g,r.width,h];
+  return [g,cssw,h];
 }
 
 // draw one series as min/max envelope per pixel column: no averaging, spikes survive
@@ -551,13 +557,13 @@ function drawSPanel(canvasId,noteId,key){
   if(!B){
     qs.forEach(q=>{g.strokeStyle=colOf(q);g.globalAlpha=sel?1:0.28;series(g,c,c[key][q],PL,w,y,!!sel);});
   }else{
-    const X=i=>tokSpan(c,Math.min(i,c.n-1),PL,w)[0];
+    const X=(i,end)=>tokSpan(c,Math.min(i,c.n-1),PL,w)[end&&i>=c.n?1:0];
     qs.forEach(q=>{
       const sums=B.sums[q];g.fillStyle=colOf(q);g.globalAlpha=sel?0.75:0.16;
       for(let b=0;b<B.edges.length;b++){
         const [a,e]=B.edges[b];
         if(e<=lo||a>hi)continue;
-        const x0=X(Math.max(a,lo)),x1=X(Math.min(e,hi+1));
+        const x0=X(Math.max(a,lo)),x1=X(Math.min(e,hi+1),true);
         g.fillRect(x0,Math.min(y(0),y(sums[b])),Math.max(1,x1-x0-1),Math.abs(y(sums[b])-y(0)));
       }
     });
