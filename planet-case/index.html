@@ -395,17 +395,41 @@ function fit(cv,h){
 }
 
 // draw one series as min/max envelope per pixel column: no averaging, spikes survive
-function series(g,arr,x0,w,y,wide){
-  const span=hi-lo+1,per=span/w;
+// The x axis is character position, not token count, so a token occupies the width of
+// the text it spells and the panels line up with the chain of thought above them.
+function charEdges(c){
+  if(c._edges)return c._edges;
+  const e=new Float64Array(c.toks.length+1);
+  for(let i=0;i<c.toks.length;i++)e[i+1]=e[i]+Math.max(1,c.toks[i].length);
+  return c._edges=e;
+}
+// Pixel span of one token, and the centre the scrub cursor snaps to.
+function tokSpan(c,i,x0,w){
+  const e=charEdges(c),a=e[lo],b=e[hi+1],k=w/Math.max(1e-9,b-a);
+  return [x0+(e[i]-a)*k,x0+(e[i+1]-a)*k];
+}
+const tokMid=(c,i,x0,w)=>{const[a,b]=tokSpan(c,i,x0,w);return (a+b)/2;};
+
+function series(g,c,arr,x0,w,y,wide){
+  // Walk tokens once, keeping a min and max per pixel column, so a token wider than a
+  // pixel draws as a run and several narrow ones inside one pixel collapse to a range.
+  const mn=new Float64Array(w).fill(Infinity),mx=new Float64Array(w).fill(-Infinity);
+  for(let i=lo;i<=hi;i++){
+    const v=arr[i];if(!(v===v))continue;
+    const [sa,sb]=tokSpan(c,i,x0,w);
+    let p0=Math.floor(sa-x0),p1=Math.ceil(sb-x0)-1;
+    if(p1<p0)p1=p0;
+    for(let px=Math.max(0,p0);px<=Math.min(w-1,p1);px++){
+      if(v<mn[px])mn[px]=v;
+      if(v>mx[px])mx[px]=v;
+    }
+  }
   g.beginPath();
   for(let px=0;px<w;px++){
-    const a=lo+Math.floor(px*per),b=Math.min(hi,lo+Math.ceil((px+1)*per)-1);
-    let mn=Infinity,mx=-Infinity;
-    for(let i=a;i<=b;i++){const v=arr[i];if(v<mn)mn=v;if(v>mx)mx=v;}
-    if(mn===Infinity)continue;
+    if(mn[px]===Infinity)continue;
     const X=x0+px+.5;
-    if(mx-mn<1e-9){g.moveTo(X,y(mn));g.lineTo(X,y(mn)+.6);}
-    else{g.moveTo(X,y(mx));g.lineTo(X,y(mn));}
+    if(mx[px]-mn[px]<1e-9){g.moveTo(X,y(mn[px]));g.lineTo(X,y(mn[px])+.6);}
+    else{g.moveTo(X,y(mx[px]));g.lineTo(X,y(mn[px]));}
   }
   g.lineWidth=wide?1.6:1;g.stroke();
 }
@@ -424,11 +448,11 @@ function drawChart(){
   QS().forEach(q=>{
     if(sel&&q===sel)return;
     g.strokeStyle=colOf(q);g.globalAlpha=sel?0.08:0.34;
-    series(g,c.alpha[q],PL,w,y,false);
+    series(g,c,c.alpha[q],PL,w,y,false);
   });
   g.globalAlpha=1;
-  if(sel){g.strokeStyle=colOf(sel);series(g,c.alpha[sel],PL,w,y,true);}
-  const cx=PL+(pos-lo)/(hi-lo)*w;
+  if(sel){g.strokeStyle=colOf(sel);series(g,c,c.alpha[sel],PL,w,y,true);}
+  const cx=tokMid(c,pos,PL,w);
   g.strokeStyle=css('--ink-2');g.setLineDash([3,3]);g.beginPath();
   g.moveTo(cx,PT);g.lineTo(cx,H-PB);g.stroke();g.setLineDash([]);
   g.textAlign='left';g.fillText('token '+num(lo),PL,H-8);
@@ -472,15 +496,15 @@ function drawImplied(){
   const qs=sel?[sel]:QS();
   qs.forEach(q=>{
     g.strokeStyle=colOf(q);g.globalAlpha=sel?1:0.28;
-    series(g,c.aImplied[q],PL,w,y,!!sel);
+    series(g,c,c.aImplied[q],PL,w,y,!!sel);
     // the probed belief on the same axis, dashed, so the gap is the thing you read
     g.setLineDash([2,3]);g.globalAlpha=sel?0.65:0.16;
     const lg=new Float32Array(c.alpha[q].length);
     for(let i=0;i<lg.length;i++)lg[i]=Math.log10(Math.max(c.alpha[q][i],1e-12));
-    series(g,lg,PL,w,y,false);g.setLineDash([]);
+    series(g,c,lg,PL,w,y,false);g.setLineDash([]);
   });
   g.globalAlpha=1;
-  const cx=PL+(pos-lo)/(hi-lo)*w;
+  const cx=tokMid(c,pos,PL,w);
   g.strokeStyle=css('--ink-2');g.setLineDash([3,3]);g.beginPath();
   g.moveTo(cx,PT);g.lineTo(cx,H-PB);g.stroke();g.setLineDash([]);
   note.innerHTML=`<span class="eq">${R().aLabel||'implied alpha'}</span>`+
@@ -525,9 +549,9 @@ function drawSPanel(canvasId,noteId,key){
   });
   const qs=sel?[sel]:QS();
   if(!B){
-    qs.forEach(q=>{g.strokeStyle=colOf(q);g.globalAlpha=sel?1:0.28;series(g,c[key][q],PL,w,y,!!sel);});
+    qs.forEach(q=>{g.strokeStyle=colOf(q);g.globalAlpha=sel?1:0.28;series(g,c,c[key][q],PL,w,y,!!sel);});
   }else{
-    const X=i=>PL+(i-lo)/(hi-lo+1)*w;
+    const X=i=>tokSpan(c,Math.min(i,c.n-1),PL,w)[0];
     qs.forEach(q=>{
       const sums=B.sums[q];g.fillStyle=colOf(q);g.globalAlpha=sel?0.75:0.16;
       for(let b=0;b<B.edges.length;b++){
@@ -539,7 +563,7 @@ function drawSPanel(canvasId,noteId,key){
     });
   }
   g.globalAlpha=1;
-  const cx=PL+(pos-lo)/(hi-lo)*w;
+  const cx=tokMid(c,pos,PL,w);
   g.strokeStyle=css('--ink-2');g.setLineDash([3,3]);g.beginPath();
   g.moveTo(cx,PT);g.lineTo(cx,H-PB);g.stroke();g.setLineDash([]);
   $(noteId).innerHTML=`<span class="eq">${seriesLabel(key)}</span>`;
@@ -586,8 +610,7 @@ function drawCand(){
   const c=C(),box=$('cand');
   const note=t=>{box.innerHTML=`<p class="hint" style="margin:0">${t}</p>`;};
   if(!c.cand)return note('No candidate breakdown was exported for this run.');
-  if(!sel)return note('Pick a query first &mdash; &alpha;(v) is the belief that query would '+
-    'hold after each candidate, so the reweighting only exists one query at a time.');
+  if(!sel)return note('Pick a query on the right to inspect candidates at this token.');
   const D=candOf(c,sel);
   if(!D)return note(`Nothing stored for ${esc(sel)}.`);
   const AL=D.alpha[sel];
@@ -686,8 +709,7 @@ function drawScatter(){
 function drawQDetail(){
   const c=C(),box=$('qdetail');
   if(!sel){
-    box.innerHTML=`<p class="hint" style="margin:0">Pick a query on the left to isolate its `+
-      `trajectory in both charts and read its proposition.</p>`;
+    box.innerHTML=`<p class="hint" style="margin:0">Pick a query on the right to isolate its trajectory.</p>`;
     return;
   }
   const text=c.qtext[sel]||'(proposition not recorded in this export)';
@@ -748,10 +770,15 @@ function render(){
   drawCot();drawZbar();drawScrub();
 }
 
+// Invert the character axis: the click lands in whichever token's span contains it, so
+// the cursor always sits on a whole token rather than between two.
 function xToTok(ev,cv){
-  const r=cv.getBoundingClientRect(),PL=42,PR=8;
-  const w=r.width-PL-PR,f=((ev.clientX-r.left)-PL)/w;
-  return Math.max(lo,Math.min(hi,Math.round(lo+f*(hi-lo))));
+  const c=C(),r=cv.getBoundingClientRect(),PL=42,PR=8;
+  const w=r.width-PL-PR,f=Math.max(0,Math.min(1,((ev.clientX-r.left)-PL)/w));
+  const e=charEdges(c),ch=e[lo]+f*(e[hi+1]-e[lo]);
+  let a=lo,b=hi;
+  while(a<b){const m=(a+b+1)>>1;if(e[m]<=ch)a=m;else b=m-1;}
+  return a;
 }
 ['chart','schart','schart2','schart3'].forEach(id=>{
   const cv=$(id);let down=false;
