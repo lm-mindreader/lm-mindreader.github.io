@@ -633,7 +633,9 @@ function drawCand(){
     rows.push({tok:c.cand.vocab[D.v[i]],A:Math.exp(D.a[i]),al:AL[i],
       d:Math.exp(lw[i-a]-mxw)/z,real:(i-a)===D.r[j]});
   }
-  rows.sort((x,y)=>y.d-x.d);
+  // A(v) is frozen at generation and the same under every query, so ordering on it keeps
+  // the rows still when the selection changes and only the numbers move.
+  rows.sort((x,y)=>y.A-x.A||y.al-x.al);
   box.innerHTML=`<table class="ctab"><thead><tr><th>token</th><th>A(v)</th>`+
     `<th>&alpha;(v)</th><th>&delta;(v)</th></tr></thead><tbody>`+
     rows.map(r=>`<tr class="${r.real?'real':''}"><td class="tk">${esc(JSON.stringify(r.tok).slice(1,-1))}</td>`+
