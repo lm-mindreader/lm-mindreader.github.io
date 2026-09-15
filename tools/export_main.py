@@ -3,7 +3,6 @@ import base64
 import importlib.util
 import json
 import logging
-import math
 import os
 import re
 import sys
@@ -22,7 +21,6 @@ _SETS = [
     ('04-09-32_1807530', 'PlanetCase R1-1.5B'),
     ('04-09-32_1807532', 'PlanetCase R1-7B'),
 ]
-_A_FLOOR = -12.0
 _S_COLUMNS = {'s': 's_delta', 'sAlpha': 's_alpha', 'sReweight': 's_delta_reweighted'}
 _D_COLUMNS = {'d': 'log_delta', 'dEq12': 'log_delta_reweighted'}
 # A paragraph starts after a blank line, and a sentence after closing punctuation and whitespace.
@@ -42,17 +40,17 @@ _S_SERIES = [
         'label': 's<sub>i</sub> = log(&delta;<sub>i</sub> / A<sub>i</sub>), &delta;(v) &prop; A(v)&thinsp;&alpha;(v) over the frozen candidates',  # noqa: E501
     },
 ]
+# Each delta is stored as its log, and the page draws the probability itself.
 _D_SERIES = [
     {
         'key': 'd',
-        'label': 'log &delta;<sub>i</sub> = log P(Y<sub>i</sub> | X&prime;, Y<sub>&lt;i</sub>)',
+        'label': '&delta;<sub>i</sub> = P(Y<sub>i</sub> | X&prime;, Y<sub>&lt;i</sub>), teacher-forced',  # noqa: E501
     },
     {
         'key': 'dEq12',
-        'label': 'log &delta;<sub>i</sub>, &delta;(v) &prop; A(v)&thinsp;&alpha;(v) renormalised over the frozen candidates',  # noqa: E501
+        'label': '&delta;<sub>i</sub>, Bayes-reweighted: &delta;(v) &prop; A(v)&thinsp;&alpha;(v) renormalised over the frozen candidates',  # noqa: E501
     },
 ]
-_A_LABEL = 'log<sub>10</sub> &alpha;<sub>i</sub> = log<sub>10</sub>&thinsp;&gamma; + &Sigma;<sub>k&le;i</sub> s<sub>k</sub> / ln&thinsp;10'  # noqa: E501
 
 
 def _main_repo(
@@ -120,15 +118,6 @@ def _buckets(
     return buckets
 
 
-def _implied(
-    gamma: float,
-    s: np.ndarray,
-) -> np.ndarray:
-    running = math.log10(max(gamma, 1e-12)) + np.cumsum(np.nan_to_num(s)) / math.log(10)
-    implied = np.clip(running, _A_FLOOR, 0)
-    return implied
-
-
 def _percentile(
     values: np.ndarray,
     q: float,
@@ -180,7 +169,7 @@ def _series(
     order: list[str],
 ) -> dict[str, dict[str, np.ndarray]]:
     ordered = rows.sort_values(['query', 'token_index'])
-    columns = {**_S_COLUMNS, **_D_COLUMNS, 'alpha': 'alpha', 'gamma': 'gamma'}
+    columns = {**_S_COLUMNS, **_D_COLUMNS, 'alpha': 'alpha'}
     series = {
         key: {q: ordered.loc[ordered['query'] == q, column].to_numpy(np.float64) for q in order}
         for key, column in columns.items()
@@ -238,13 +227,10 @@ def _quantise_case(
     """
     Fills the case's encoded series and returns each series' largest error once decoded.
     """
-    implied = {q: _implied(series['gamma'][q][0], series['s'][q]) for q in order}
-    wanted = {**{key: series[key] for key in ranges}, 'aImplied': implied}
     errors = {}
-    for key, values in wanted.items():
-        lo, hi = ranges.get(key, (_A_FLOOR, 0.0))
-        case[key] = {q: _quantised(values[q], lo, hi) for q in order}
-        gaps = [np.max(np.abs(_decoded(case[key][q], lo, hi) - values[q])) for q in order]
+    for key, (lo, hi) in ranges.items():
+        case[key] = {q: _quantised(series[key][q], lo, hi) for q in order}
+        gaps = [np.max(np.abs(_decoded(case[key][q], lo, hi) - series[key][q])) for q in order]
         errors[key] = float(max(gaps))
     return errors
 
@@ -329,8 +315,6 @@ def _run(
         'dSeries': _D_SERIES,
         'dLo': d_range[0],
         'dHi': d_range[1],
-        'aLabel': _A_LABEL,
-        'aFloor': _A_FLOOR,
         'cap': '',
         'model': model,
         'sLo': s_range[0],

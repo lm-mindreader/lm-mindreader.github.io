@@ -48,9 +48,8 @@ For every token of a chain, and every query:
 - **Pointwise information s** — the same quantity three ways: differenced off the belief,
   read teacher-forced against a context that demands the query, and rebuilt from the frozen
   candidates.
-- **Guided log δ** — the measure s is read off, in both of its variants.
-- **Belief α implied by δ** — γ·exp(Σs) against the probed α, on a log axis. The distance
-  between them is the telescoping residual.
+- **Guided probability δ**: the probability of the chain's own token when the answer is
+  required to contain the query, estimated teacher-forced and by Bayes reweighting.
 - **Candidates at this token** — what else the model could have written, and what each would
   have done to the belief.
 
