@@ -253,6 +253,18 @@ function caseAt(r,i){
     for(const q in src[e.key])S[q]=deq(src[e.key][q],R.sLo,R.sHi);
     out[e.key]=S;
   }
+  // The log deltas share their own range, and the implied belief runs from the floor to 0.
+  for(const e of (R.dSeries||[])){
+    if(!src[e.key])continue;
+    const S={};
+    for(const q in src[e.key])S[q]=deq(src[e.key][q],R.dLo,R.dHi);
+    out[e.key]=S;
+  }
+  if(src.aImplied){
+    const S={};
+    for(const q in src.aImplied)S[q]=deq(src.aImplied[q],R.aFloor,0);
+    out.aImplied=S;
+  }
   return CACHE[key]=Object.assign({},src,out,{alpha:A});
 }
 

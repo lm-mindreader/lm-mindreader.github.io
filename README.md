@@ -3,17 +3,20 @@
 Token-level belief trajectories over reasoning chains of thought, at
 <https://lm-mindreader.github.io/>.
 
-Both pages are the same viewer over a different problem set, built by
-`src/utils/scripts/belief_viewer_export.py` in the main repo.
+Both pages are the same viewer over a different problem set, each carrying its data inline.
+The main page was exported on 2026-09-15 from the main repo's belief runs of 2026-09-14, jobs 1807530 to 1807533, by `tools/export_main.py`.
 
 ## The main page
 
-DeepSeek-R1-Distill-Qwen-1.5B on MMLU-Redux-2.0 `formal_logic`, all 100 questions including
-the 13 the re-annotation flagged.
-The chains were generated with the full token-level record frozen at generation: the realized
-token, its free log-probability, its vocabulary rank and the top-50 candidates.
-Belief scoring is a pilot over the three shortest chains against the full 20-query panel,
-60 (chain, query) cells.
+DeepSeek-R1-Distill-Qwen at 1.5B and 7B on the two cases below, eight chains each: 32 chains in four tabs, every token scored.
+α is the median over three yes/no phrasings, the teacher-forced δ adds the requirement to the question, and the reweighted δ is built from each token's ten likeliest candidates plus its own.
+
+To rebuild it, run the exporter from the main repo, whose environment and `logs/` it reads:
+
+```sh
+cd ../lm-mindreader
+uv run python ../lm-mindreader.github.io/tools/export_main.py
+```
 
 ## `/debug`
 
@@ -74,8 +77,8 @@ proposition.
 
 ## Read this before drawing conclusions
 
-The belief probe does not currently separate contradictory propositions well: on the main
-page `solution_correct` and `solution_incorrect` state opposite answers yet their
+The belief probe does not currently separate contradictory propositions well: on the earlier
+MMLU pilot `solution_correct` and `solution_incorrect` state opposite answers yet their
 trajectories correlate.
 Most of the movement in α is shared across every query rather than specific to one — on the
 planet chains about 69% of it.
