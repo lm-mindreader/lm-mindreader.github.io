@@ -18,6 +18,15 @@ cd ../lm-mindreader
 uv run python ../lm-mindreader.github.io/tools/export_main.py
 ```
 
+## `/live`
+
+The same viewer over every belief run in MLflow, read live from `https://mlflow.mi2.ai`.
+It asks for an MLflow username and password, keeps them only for that browser tab, and sends them with each request.
+It lists the `lm-mindreader/*` experiments: each belief job is a set, labelled with its prompt option, and each chain loads its files when opened.
+
+The MLflow server has to admit `https://lm-mindreader.github.io` in its allowed CORS origins, or the browser refuses every answer.
+Until then it can be tried from `http://localhost:8000`, which the server admits: run `python -m http.server 8000` in this repo and open `http://localhost:8000/live/`.
+
 ## `/debug`
 
 Two small cases on Qwen2.5-1.5B-Instruct, picked from the worked trajectories in Sec 8.1.
